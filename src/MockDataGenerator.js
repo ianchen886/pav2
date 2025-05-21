@@ -8,6 +8,7 @@
  * are available (likely in Utils.gs or Models.gs).
  * Assumes sheet name constants (PA_...) are defined in Config.gs.
  */
+// eslint-disable-next-line no-unused-vars
 function populateMockPaRawSubmissionsV2() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const ui = SpreadsheetApp.getUi();

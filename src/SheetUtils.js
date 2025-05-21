@@ -1,14 +1,32 @@
+/* global PA_EVALUATOR_ANALYTICS_SHEET_NAME, PA_FINAL_SCORES_SUMMARY_SHEET_NAME, PA_REPORT_ALL_RESPONSES_SHEET_NAME, PA_REPORT_MISSING_ASSESSMENTS_SHEET_NAME, PA_VERIFICATION_MISSING_ASSESSMENTS_SHEET_NAME*/
+
+/**
+ * @file SheetUtils.js
+ * @description This file provides utility functions for managing (primarily clearing)
+ * various output sheets used in the Peer Assessment system. These functions are
+ * typically invoked from the custom menu in Google Sheets.
+ *
+ * @requires Config.gs (for sheet name constants like PA_EVALUATOR_ANALYTICS_SHEET_NAME)
+ */
+
 // In SheetUtils.gs (or your chosen utility file)
 
 /**
- * Clears all content and formatting from specified sheets, leaving headers if they exist.
- * If the sheet doesn't exist, it does nothing for that sheet.
- * @param {string[]} sheetNamesArray - An array of sheet names to clear.
- * @param {boolean} [keepHeaders=true] - If true, clears from row 2 downwards. If false, clears entire sheet.
+ * Clears all content from specified sheets. Optionally keeps headers.
+ * If a sheet doesn't exist, it logs the event and continues.
+ * Displays an alert summarizing the operation.
+ *
+ * @function clearSpecifiedSheets
+ * @param {string[]} sheetNamesArray - An array of sheet names (strings) to be cleared.
+ * @param {boolean} [keepHeaders=true] - If true (default), clears content from row 2 downwards.
+ *                                      If false, clears the entire sheet including headers and formats.
  */
+
+// This function is called by other functions in this file which are menu items.
+// ESLint might not trace this usage back effectively, so we disable the warning.
 function clearSpecifiedSheets(sheetNamesArray, keepHeaders = true) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const ui = SpreadsheetApp.getUi();
+  const ui = SpreadsheetApp.getUi(); // Using SpreadsheetApp.getUi() for consistency
   let clearedCount = 0;
   let notFoundCount = 0;
   let sheetsClearedNames = [];
@@ -22,19 +40,14 @@ function clearSpecifiedSheets(sheetNamesArray, keepHeaders = true) {
     const sheet = ss.getSheetByName(sheetName);
     if (sheet) {
       if (keepHeaders && sheet.getLastRow() > 0) {
-        // Clear content from row 2 downwards, but keep formatting unless specified
-        if (sheet.getLastRow() > 1) { // Only if there's data beyond headers
+        if (sheet.getLastRow() > 1) { 
             sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getMaxColumns()).clearContent();
         }
-        // Optionally clear formats too if desired, or just leave them:
-        // sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getMaxColumns()).clearFormat();
         Logger.log(`Cleared content (below headers) for sheet: "${sheetName}"`);
       } else if (!keepHeaders) {
-        // Clear entire sheet including headers and formats
         sheet.clearContents().clearFormats();
         Logger.log(`Cleared all content and formats for sheet: "${sheetName}"`);
       } else {
-        // Sheet exists but is empty or only has headers, nothing to clear below headers
          Logger.log(`Sheet "${sheetName}" is empty or only has headers. No content cleared below headers.`);
       }
       clearedCount++;
@@ -52,36 +65,75 @@ function clearSpecifiedSheets(sheetNamesArray, keepHeaders = true) {
   if (notFoundCount > 0) {
     message += `${notFoundCount} specified sheet(s) were not found.`;
   }
-  if (!message) {
-    message = "No sheets were specified or found to clear.";
+  if (message.trim() === "") { // Check if message is still effectively empty
+    message = "No action taken: No sheets specified, found, or needing content cleared.";
   }
   ui.alert("Clear Sheets Operation", message, ui.ButtonSet.OK);
 }
 
 // --- Specific wrapper functions for menu items ---
+// These functions are primarily entry points called from the Google Sheets custom menu.
+// Therefore, they will appear as "unused" to ESLint's static analysis.
+// We use eslint-disable-next-line to acknowledge this.
 
+/**
+ * Clears content (below headers) from the 'PaEvaluatorAnalytics' sheet.
+ * Invoked from the custom menu.
+ * @function clearEvaluatorAnalyticsSheet
+ */
+// eslint-disable-next-line no-unused-vars
 function clearEvaluatorAnalyticsSheet() {
-  clearSpecifiedSheets([PA_EVALUATOR_ANALYTICS_SHEET_NAME], true); // keepHeaders = true
+  clearSpecifiedSheets([PA_EVALUATOR_ANALYTICS_SHEET_NAME], true); 
 }
 
+/**
+ * Clears content (below headers) from the 'PaFinalScoresSummary' sheet.
+ * Invoked from the custom menu.
+ * @function clearFinalScoresSummarySheet
+ */
+// eslint-disable-next-line no-unused-vars
 function clearFinalScoresSummarySheet() {
-  clearSpecifiedSheets([PA_FINAL_SCORES_SUMMARY_SHEET_NAME], true); // true to keep headers, as the main function repopulates them if needed
+  clearSpecifiedSheets([PA_FINAL_SCORES_SUMMARY_SHEET_NAME], true); 
 }
 
+/**
+ * Clears content (below headers) from the 'PaReportAllResponses' sheet.
+ * Invoked from the custom menu.
+ * @function clearReportAllResponsesSheet
+ */
+// eslint-disable-next-line no-unused-vars
 function clearReportAllResponsesSheet() {
   clearSpecifiedSheets([PA_REPORT_ALL_RESPONSES_SHEET_NAME], true);
 }
 
+/**
+ * Clears content (below headers) from the 'PaReportMissingAssessments' sheet.
+ * Invoked from the custom menu.
+ * @function clearMissingAssessmentsReportSheet
+ */
+// eslint-disable-next-line no-unused-vars
 function clearMissingAssessmentsReportSheet() {
   clearSpecifiedSheets([PA_REPORT_MISSING_ASSESSMENTS_SHEET_NAME], true);
 }
 
+/**
+ * Clears content (below headers) from the 'PaVerificationMissingAssessments' sheet.
+ * Invoked from the custom menu.
+ * @function clearVerificationMissingAssessmentsSheet
+ */
+// eslint-disable-next-line no-unused-vars
 function clearVerificationMissingAssessmentsSheet() {
   clearSpecifiedSheets([PA_VERIFICATION_MISSING_ASSESSMENTS_SHEET_NAME], true);
 }
 
+/**
+ * Prompts the user for confirmation and then clears content (below headers)
+ * from all primary output/report sheets. Invoked from the custom menu.
+ * @function clearALLOutputSheets
+ */
+// eslint-disable-next-line no-unused-vars
 function clearALLOutputSheets() {
-  const ui = SpreadsheetApp.getUi();
+  const ui = SpreadsheetApp.getUi(); // Get Ui instance again, as it's good practice within the function
   const result = ui.alert(
     "Confirm Clear All",
     "Are you sure you want to clear all generated report and analytics sheets (content below headers)? This cannot be undone.",
@@ -95,7 +147,7 @@ function clearALLOutputSheets() {
       PA_REPORT_MISSING_ASSESSMENTS_SHEET_NAME,
       PA_VERIFICATION_MISSING_ASSESSMENTS_SHEET_NAME
     ];
-    clearSpecifiedSheets(sheetsToClear, true); // keepHeaders = true
+    clearSpecifiedSheets(sheetsToClear, true); 
   } else {
     ui.alert("Clear Canceled", "Operation to clear all output sheets was canceled.", ui.ButtonSet.OK);
   }

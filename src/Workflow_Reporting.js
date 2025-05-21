@@ -1,26 +1,46 @@
-// In Workflow_Reporting.gs
+/* global PA_REPORT_ALL_RESPONSES_SHEET_NAME, PA_REPORT_MISSING_ASSESSMENTS_SHEET_NAME, PA_VERIFICATION_MISSING_ASSESSMENTS_SHEET_NAME, parseRawSurveyData, generateEvaluatorAnalyticsAndWeights, isValidProductionUnit*/ 
+// Keep GAS services here for now for explicitness if preferred
 
 /**
- * Generates a report of all raw responses with evaluator weights.
- * - Uses camelCase headers for the report sheet.
- * - Creates/clears the report sheet and populates headers.
+ * @file Workflow_Reporting.js
+ * @description This file contains functions dedicated to generating various reports
+ * for the Peer Assessment system. These include a raw scores report, a report on
+ * missing assessments, and a verification utility for the missing assessments report.
+ * These functions are typically invoked from the custom menu in Google Sheets.
+ *
+ * @requires Config.gs (for various PA_..._SHEET_NAME constants)
+ * @requires Parser_V2.js (for parseRawSurveyData function)
+ * @requires Workflow_Analytics.js (for generateEvaluatorAnalyticsAndWeights function)
+ * @requires Utils.js (for isValidProductionUnit function)
  */
+
+// In Workflow_Reporting.gs // Your existing comment
+
+/**
+ * Generates a detailed report of all individual raw responses submitted by students.
+ * This report includes the timestamp, evaluated student details, question details,
+ * response type (SCORE/COMMENT), response value, evaluator details, the evaluator's
+ * calculated weight (from {@link generateEvaluatorAnalyticsAndWeights}), and the unit
+ * context of the evaluation. The output is written to the 'PaReportAllResponses' sheet.
+ * This function is invoked from the custom menu.
+ *
+ * @function generateRawScoresReportWithWeights
+ */
+// eslint-disable-next-line no-unused-vars
 function generateRawScoresReportWithWeights() {
-  var ui = SpreadsheetApp.getUi();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi(); // Using const for consistency
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   Logger.clear();
   Logger.log("--- Starting Raw Scores Report Generation (camelCase Headers, with Weights, using V2 Parser) ---");
 
   const reportSheetName = PA_REPORT_ALL_RESPONSES_SHEET_NAME;
 
-  // *** USING V2 PARSER ***
   const parsedData = parseRawSurveyData(); 
   if (!parsedData || !parsedData.students || !parsedData.responses || !parsedData.questions) {
     ui.alert("Data Parsing Error", "Could not parse necessary data using V2 parser. Cannot generate raw scores report.", ui.ButtonSet.OK); 
     Logger.log("ERROR: V2 Parser did not return expected data for raw scores report.");
     return;
   }
-  // allStudents map contains { studentId: "...", studentName: "...", studentEmail: "...", ... }
   const { students: allStudents, questions, responses } = parsedData;
   
   const evaluatorWeights = generateEvaluatorAnalyticsAndWeights(); 
@@ -30,7 +50,6 @@ function generateRawScoresReportWithWeights() {
       Logger.log("Info: Evaluator weights object is empty. Weights column will show 'N/A' or default.");
   }
 
-
   if (responses.length === 0 && Object.keys(allStudents).length === 0){ 
     ui.alert("No Data", "No students or responses found after V2 parsing. Raw scores report not generated.", ui.ButtonSet.OK); 
     Logger.log("No student or response data available for raw scores report (V2 Parser).");
@@ -38,20 +57,19 @@ function generateRawScoresReportWithWeights() {
   }
   Logger.log(`Generating raw scores report from ${responses.length} responses (V2 Parser).`);
 
-  var reportSheet = ss.getSheetByName(reportSheetName);
+  let reportSheet = ss.getSheetByName(reportSheetName); // Use let
   if (reportSheet) {
     Logger.log(`Sheet "${reportSheetName}" found. Clearing all contents and formats.`);
     reportSheet.clearContents().clearFormats();
   } else {
     reportSheet = ss.insertSheet(reportSheetName);
-    // ui.alert("Sheet Created", `Report sheet named "${reportSheetName}" was not found and has been created.`, ui.ButtonSet.OK); // Can be noisy
     Logger.log(`Sheet "${reportSheetName}" created.`);
   }
 
   const headers = [
     "timestamp", "evaluatedStudentId", "evaluatedStudentName", 
     "questionId", "questionPrompt", "responseType", "responseValue", 
-    "evaluatorId", "evaluatorName", "evaluatorWeight", "unitContextOfEvaluation" // Added unitContext
+    "evaluatorId", "evaluatorName", "evaluatorWeight", "unitContextOfEvaluation"
   ];
   
   reportSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
@@ -59,9 +77,8 @@ function generateRawScoresReportWithWeights() {
   reportSheet.setFrozenRows(1);
   Logger.log(`Populated camelCase headers in "${reportSheetName}".`);
 
-  var outputRows = []; 
+  const outputRows = []; // Use const
   for (const response of responses) {
-    // Student objects from V2 parser have .studentName, .studentId etc.
     const evaluatedStudentInfo = allStudents[response.evaluatedStudentId] || { studentName: `[Orphaned ID: ${response.evaluatedStudentId || 'N/A'}]` };
     const evaluatorStudentInfo = allStudents[response.responseByStudentId] || { studentName: `[Orphaned ID: ${response.responseByStudentId || 'N/A'}]` };
     const questionInfo = questions[response.responseToQuestionId] || { questionPrompt: `[Unknown Question ID: ${response.responseToQuestionId || 'N/A'}]` };
@@ -75,15 +92,15 @@ function generateRawScoresReportWithWeights() {
     outputRows.push([
       response.timestamp, 
       response.evaluatedStudentId || "", 
-      evaluatedStudentInfo.studentName, // Uses .studentName
+      evaluatedStudentInfo.studentName, 
       response.responseToQuestionId || "",
       questionInfo.questionPrompt, 
       response.responseType || "", 
       response.responseValue,
       response.responseByStudentId || "", 
-      evaluatorStudentInfo.studentName, // Uses .studentName
+      evaluatorStudentInfo.studentName, 
       evaluatorWeightValue,
-      response.unitContextOfEvaluation || "" // Added
+      response.unitContextOfEvaluation || ""
     ]);
   }
 
@@ -98,9 +115,15 @@ function generateRawScoresReportWithWeights() {
             reportSheet.getRange(2, colIdx + 1, outputRows.length, 1).setHorizontalAlignment("center");
         }
     });
-    reportSheet.getRange(2, headers.indexOf("timestamp") + 1, outputRows.length, 1).setNumberFormat("yyyy-mm-dd hh:mm:ss");
-    if (headers.indexOf("evaluatorWeight") !== -1) {
-        reportSheet.getRange(2, headers.indexOf("evaluatorWeight") + 1, outputRows.length, 1).setNumberFormat("0.000");
+    // Ensure timestamp column exists before formatting
+    const timestampColIdx = headers.indexOf("timestamp");
+    if (timestampColIdx !== -1) {
+        reportSheet.getRange(2, timestampColIdx + 1, outputRows.length, 1).setNumberFormat("yyyy-mm-dd hh:mm:ss");
+    }
+    // Ensure evaluatorWeight column exists before formatting
+    const weightColIdx = headers.indexOf("evaluatorWeight");
+    if (weightColIdx !== -1) {
+        reportSheet.getRange(2, weightColIdx + 1, outputRows.length, 1).setNumberFormat("0.000");
     }
     
     try { reportSheet.autoResizeColumns(1, headers.length); } catch (e) { Logger.log(`Warning: autoResizeColumns failed. Error: ${e.message}`); }
@@ -109,7 +132,6 @@ function generateRawScoresReportWithWeights() {
   } else {
     reportSheet.getRange(2,1).setValue("No response data to display (V2 Parser).");
     Logger.log("No data rows to write to raw scores report (V2 Parser).");
-    // ui.alert("Info", "No response data was found to populate the raw scores report.", ui.ButtonSet.OK);
   }
   ss.setActiveSheet(reportSheet);
   Logger.log("--- Raw Scores Report (V2 Parser) Generation Complete ---");
@@ -117,27 +139,29 @@ function generateRawScoresReportWithWeights() {
 
 
 /**
- * Finds students who haven't assessed all required peers in their primary unit(s).
- * - Uses camelCase headers for the report sheet.
- * - Creates/clears the report sheet and populates headers.
+ * Identifies students who may not have completed all required evaluations for their peers
+ * within their assigned production unit(s). It compares the expected peer evaluations against
+ * actual submissions recorded. The results are outputted to the 'PaReportMissingAssessments' sheet.
+ * This function is invoked from the custom menu.
  * - USES THE V2 PARSER.
+ *
+ * @function findStudentsWhoHaventAssessedSpecificPeers
  */
+// eslint-disable-next-line no-unused-vars
 function findStudentsWhoHaventAssessedSpecificPeers() {
-  var ui = SpreadsheetApp.getUi();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   Logger.clear(); 
   Logger.log("--- findStudentsWhoHaventAssessedSpecificPeers: Starting (camelCase Headers, V2 Parser) ---");
 
   const reportSheetName = PA_REPORT_MISSING_ASSESSMENTS_SHEET_NAME;
 
-  // *** USING V2 PARSER ***
   const parsedData = parseRawSurveyData(); 
-  if (!parsedData || !parsedData.students || !parsedData.responses) { // Questions not strictly needed here, but good to check
+  if (!parsedData || !parsedData.students || !parsedData.responses) {
     ui.alert("Data Parsing Error", "Could not parse necessary data using V2 parser. Cannot find missing assessments.", ui.ButtonSet.OK);
     Logger.log("ERROR: V2 Parser did not return expected data (students/responses) for missing assessment check.");
     return;
   }
-  // allStudentsMaster contains student objects with .studentId, .studentName, .studentEmail, .productionUnit1, .productionUnit2, .status
   const { students: allStudentsMaster, responses } = parsedData;
 
   if (Object.keys(allStudentsMaster).length === 0) { 
@@ -147,52 +171,48 @@ function findStudentsWhoHaventAssessedSpecificPeers() {
   }
   Logger.log(`findStudentsWhoHaventAssessedSpecificPeers: Using ${Object.keys(allStudentsMaster).length} students from V2 parsed data.`);
 
-  var studentsByUnit = { "A": [], "B": [], "C": [], "D": [] }; // Add more units if needed
+  const studentsByUnit = {}; // Changed: var to const. Will add units dynamically.
   for (const studentId in allStudentsMaster) {
-    const student = allStudentsMaster[studentId]; // student object has .productionUnit1
-    if (student && student.productionUnit1 && isValidProductionUnit(student.productionUnit1)) {
-      if (!studentsByUnit[student.productionUnit1]) studentsByUnit[student.productionUnit1] = []; // Initialize if unit not seen
-      studentsByUnit[student.productionUnit1].push(student.studentId); // Store ID
-    }
-    // Consider productionUnit2 if students can belong to and assess in multiple primary units
-    if (student && student.productionUnit2 && isValidProductionUnit(student.productionUnit2)) {
-      if (!studentsByUnit[student.productionUnit2]) studentsByUnit[student.productionUnit2] = [];
-      if (!studentsByUnit[student.productionUnit2].includes(student.studentId)) { // Avoid duplicates if same as unit1
-          studentsByUnit[student.productionUnit2].push(student.studentId);
-      }
+    if (Object.prototype.hasOwnProperty.call(allStudentsMaster, studentId)) { // Good practice
+        const student = allStudentsMaster[studentId]; 
+        if (student && student.productionUnit1 && isValidProductionUnit(student.productionUnit1)) {
+          if (!studentsByUnit[student.productionUnit1]) studentsByUnit[student.productionUnit1] = []; 
+          studentsByUnit[student.productionUnit1].push(student.studentId); 
+        }
+        if (student && student.productionUnit2 && isValidProductionUnit(student.productionUnit2)) {
+          if (!studentsByUnit[student.productionUnit2]) studentsByUnit[student.productionUnit2] = [];
+          if (!studentsByUnit[student.productionUnit2].includes(student.studentId)) { 
+              studentsByUnit[student.productionUnit2].push(student.studentId);
+          }
+        }
     }
   }
   Logger.log("findStudentsWhoHaventAssessedSpecificPeers: studentsByUnit populated.");
 
-  var assessmentsMade = {}; // Structure: { evaluatorId: { unitKey: Set(evaluatedId1, evaluatedId2), ... }, ... }
+  const assessmentsMade = {}; // Changed: var to const
   responses.forEach(response => {
-    // response object has .responseByStudentId, .evaluatedStudentId, .unitContextOfEvaluation
     if (response.responseByStudentId && response.evaluatedStudentId) {
         const evaluatorId = response.responseByStudentId;
         const evaluatedId = response.evaluatedStudentId;
-        const evaluatorDetails = allStudentsMaster[evaluatorId]; // Get full student object
-
-        // Use unitContextOfEvaluation from response if available and valid.
-        // Fallback to evaluator's primary unit (productionUnit1) if context is missing or invalid.
+        const evaluatorDetails = allStudentsMaster[evaluatorId]; 
+        
         let unitOfEvaluation = null;
         if (response.unitContextOfEvaluation && isValidProductionUnit(response.unitContextOfEvaluation)) {
             unitOfEvaluation = response.unitContextOfEvaluation;
         } else if (evaluatorDetails && evaluatorDetails.productionUnit1 && isValidProductionUnit(evaluatorDetails.productionUnit1)) {
             unitOfEvaluation = evaluatorDetails.productionUnit1;
-            // Logger.log(`INFO: No valid unitContext for response by ${evaluatorId} to ${evaluatedId}. Using evaluator's unit1: ${unitOfEvaluation}`);
         } else {
-            // Logger.log(`WARNING: Cannot determine unit context for response by ${evaluatorId} to ${evaluatedId}. Skipping this response for missing assessment counts.`);
-            return; // Skip if no valid unit context can be determined
+            return; 
         }
         
         if (!assessmentsMade[evaluatorId]) assessmentsMade[evaluatorId] = {};
-        if (!assessmentsMade[evaluatorId][unitOfEvaluation]) assessmentsMade[evaluatorId][unitOfEvaluation] = new Set();
+        if (!assessmentsMade[evaluatorId][unitOfEvaluation]) assessmentsMade[evaluatorId][unitOfEvaluation] = new Set(); // Set is a built-in JS global
         assessmentsMade[evaluatorId][unitOfEvaluation].add(evaluatedId);
     }
   });
   Logger.log("findStudentsWhoHaventAssessedSpecificPeers: assessmentsMade structure built.");
   
-  var reportSheet = ss.getSheetByName(reportSheetName);
+  let reportSheet = ss.getSheetByName(reportSheetName); // Changed: var to let
   if (reportSheet) {
     Logger.log(`Sheet "${reportSheetName}" found. Clearing all contents and formats.`);
     reportSheet.clearContents().clearFormats();
@@ -215,64 +235,53 @@ function findStudentsWhoHaventAssessedSpecificPeers() {
   let foundAnyMissing = false;
 
   for (const evaluatorId in allStudentsMaster) { 
-    if (!allStudentsMaster.hasOwnProperty(evaluatorId) || evaluatorId.startsWith("UNKNOWNID_")) continue;
-
-    const evaluator = allStudentsMaster[evaluatorId]; // Full student object
-    
-    // Determine units this evaluator is expected to assess peers IN.
-    // This should correspond to the units they are a member of.
-    const unitsEvaluatorBelongsTo = [];
-    if (evaluator.productionUnit1 && isValidProductionUnit(evaluator.productionUnit1)) {
-        unitsEvaluatorBelongsTo.push(evaluator.productionUnit1);
-    }
-    if (evaluator.productionUnit2 && isValidProductionUnit(evaluator.productionUnit2) && !unitsEvaluatorBelongsTo.includes(evaluator.productionUnit2)) {
-        unitsEvaluatorBelongsTo.push(evaluator.productionUnit2);
-    }
-
-    if (unitsEvaluatorBelongsTo.length === 0) {
-      // This evaluator has no valid primary units assigned in the master list.
-      // They might still have made assessments if unitContext was in response, but we can't determine who they *should* have assessed.
-      // Logger.log(`INFO: Evaluator ${evaluator.studentId} (${evaluator.studentName}) has no valid primary unit(s) in master list. Cannot determine expected peers.`);
-      // Optionally, list them with a note if you want to flag this.
-      // reportDataRows.push([evaluator.studentId, evaluator.studentName, evaluator.studentEmail, "N/A (No Valid Unit in Master)", "N/A (Check Setup)", "N/A"]);
-      // foundAnyMissing = true; 
-      continue;
-    }
-
-    for (const unitKey of unitsEvaluatorBelongsTo) { // unitKey is the unit the evaluator belongs to, e.g., "A"
-        const peersInThisUnit = studentsByUnit[unitKey] || []; // IDs of all students in this unit
+    if (Object.prototype.hasOwnProperty.call(allStudentsMaster, evaluatorId) && !evaluatorId.startsWith("UNKNOWNID_")) { // Good practice and ignore UNKNOWNID as evaluators
+        const evaluator = allStudentsMaster[evaluatorId]; 
         
-        // Get the set of peers this evaluator *has* assessed *within this specific unit context*.
-        const assessedPeersInThisUnitByThisEvaluator = (assessmentsMade[evaluatorId] && assessmentsMade[evaluatorId][unitKey]) 
-                                                      ? assessmentsMade[evaluatorId][unitKey] 
-                                                      : new Set(); 
-        
-        if (peersInThisUnit.length === 0 || (peersInThisUnit.length === 1 && peersInThisUnit[0] === evaluatorId)) {
-            // If the unit is empty or only contains the evaluator, no peers to assess in this unit.
-            continue;
+        const unitsEvaluatorBelongsTo = [];
+        if (evaluator.productionUnit1 && isValidProductionUnit(evaluator.productionUnit1)) {
+            unitsEvaluatorBelongsTo.push(evaluator.productionUnit1);
+        }
+        if (evaluator.productionUnit2 && isValidProductionUnit(evaluator.productionUnit2) && !unitsEvaluatorBelongsTo.includes(evaluator.productionUnit2)) {
+            unitsEvaluatorBelongsTo.push(evaluator.productionUnit2);
         }
 
-        for (const peerId of peersInThisUnit) { // peerId is a student in the same unit as the evaluator
-          if (peerId === evaluatorId) continue; // Don't assess self
+        if (unitsEvaluatorBelongsTo.length === 0) {
+          continue;
+        }
 
-          if (!assessedPeersInThisUnitByThisEvaluator.has(peerId)) {
-            foundAnyMissing = true;
-            const peerDetails = allStudentsMaster[peerId] || { studentName: `[Unknown Peer ID: ${peerId}]`, studentId: peerId }; 
-            reportDataRows.push([ 
-                evaluator.studentId, 
-                evaluator.studentName, 
-                evaluator.studentEmail, 
-                unitKey, // The unit context in which the peer was expected to be assessed
-                peerDetails.studentId, 
-                peerDetails.studentName 
-            ]);
-          }
+        for (const unitKey of unitsEvaluatorBelongsTo) { 
+            const peersInThisUnit = studentsByUnit[unitKey] || []; 
+            
+            const assessedPeersInThisUnitByThisEvaluator = (assessmentsMade[evaluatorId] && assessmentsMade[evaluatorId][unitKey]) 
+                                                          ? assessmentsMade[evaluatorId][unitKey] 
+                                                          : new Set(); 
+            
+            if (peersInThisUnit.length === 0 || (peersInThisUnit.length === 1 && peersInThisUnit[0] === evaluatorId)) {
+                continue;
+            }
+
+            for (const peerId of peersInThisUnit) { 
+              if (peerId === evaluatorId) continue; 
+
+              if (!assessedPeersInThisUnitByThisEvaluator.has(peerId)) {
+                foundAnyMissing = true;
+                const peerDetails = allStudentsMaster[peerId] || { studentName: `[Unknown Peer ID: ${peerId}]`, studentId: peerId }; 
+                reportDataRows.push([ 
+                    evaluator.studentId, 
+                    evaluator.studentName, 
+                    evaluator.studentEmail, 
+                    unitKey, 
+                    peerDetails.studentId, 
+                    peerDetails.studentName 
+                ]);
+              }
+            }
         }
     }
   }
 
   if (foundAnyMissing && reportDataRows.length > 0) {
-    // Sort by evaluatorId, then unit, then peerNotAssessedId
     reportDataRows.sort((a, b) => {
         return (a[0].localeCompare(b[0])) || (a[3].localeCompare(b[3])) || (a[4].localeCompare(b[4]));
     });
@@ -298,21 +307,24 @@ function findStudentsWhoHaventAssessedSpecificPeers() {
 
 
 /**
- * Verifies the 'Detailed Missing Assessments' report against current data.
- * - Uses camelCase headers for its summary sheet.
- * - Creates/clears the summary sheet and populates headers.
+ * Verifies the accuracy of the 'Detailed Missing Assessments' report by re-analyzing
+ * the current raw assessment data. It compares entries in the generated report against
+ * what is currently derivable from the data. Discrepancies are noted in a summary sheet
+ * ('PaVerificationMissingAssessments'). This function is invoked from the custom menu.
  * - USES THE V2 PARSER.
+ *
+ * @function verifyMissingAssessmentsReport
  */
+// eslint-disable-next-line no-unused-vars
 function verifyMissingAssessmentsReport() {
-  var ui = SpreadsheetApp.getUi();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   Logger.clear();
   Logger.log("--- Starting Verification of Missing Assessments Report (camelCase Headers, V2 Parser) ---");
 
   const generatedReportSheetName = PA_REPORT_MISSING_ASSESSMENTS_SHEET_NAME;
   const verificationSummarySheetName = PA_VERIFICATION_MISSING_ASSESSMENTS_SHEET_NAME;
 
-  // *** USING V2 PARSER ***
   const parsedData = parseRawSurveyData(); 
   if (!parsedData || !parsedData.students || !parsedData.responses) {
     ui.alert("Data Parsing Error", "Could not parse data (V2 Parser). Cannot verify missing assessments report.", ui.ButtonSet.OK);
@@ -327,8 +339,7 @@ function verifyMissingAssessmentsReport() {
   }
   Logger.log("Verification: Using V2 parsed data for current assessment state.");
 
-  // Rebuild assessmentsMade based on CURRENT responses from V2 parsedData
-  var assessmentsMade = {}; // { evaluatorId: { unitKey: Set(evaluatedId1), ... }, ... }
+  const assessmentsMade = {}; // Changed: var to const
   responses.forEach(response => {
     if (response.responseByStudentId && response.evaluatedStudentId) {
         const evaluatorId = response.responseByStudentId;
@@ -345,28 +356,28 @@ function verifyMissingAssessmentsReport() {
         }
         
         if (!assessmentsMade[evaluatorId]) assessmentsMade[evaluatorId] = {};
-        if (!assessmentsMade[evaluatorId][unitOfEvaluation]) assessmentsMade[evaluatorId][unitOfEvaluation] = new Set();
+        if (!assessmentsMade[evaluatorId][unitOfEvaluation]) assessmentsMade[evaluatorId][unitOfEvaluation] = new Set(); // Set is built-in
         assessmentsMade[evaluatorId][unitOfEvaluation].add(evaluatedId);
     }
   });
   Logger.log("Verification: Re-built assessmentsMade structure from V2 data.");
 
-  var generatedReportSheet = ss.getSheetByName(generatedReportSheetName);
+  let generatedReportSheet = ss.getSheetByName(generatedReportSheetName); // Changed: var to let
   if (!generatedReportSheet) {
-    ui.alert("Report Not Found", `The report sheet "${generatedReportSheetName}" to verify was not found.`, ui.ButtonSet.OK);
+    ui.alert("Report Not Found", `The report sheet "${generatedReportSheetName}" to verify was not found. Please generate it first.`, ui.ButtonSet.OK);
     Logger.log(`ERROR: Report sheet "${generatedReportSheetName}" not found for verification.`);
     return;
   }
-  var reportContent = generatedReportSheet.getDataRange().getValues();
-  if (reportContent.length < 1) { // Must have at least headers
-    ui.alert("Report Empty", `The report sheet "${generatedReportSheetName}" is empty. Nothing to verify.`, ui.ButtonSet.OK);
+  const reportContent = generatedReportSheet.getDataRange().getValues(); // Changed: var to const
+  if (reportContent.length < 1) { 
+    ui.alert("Report Empty", `The report sheet "${generatedReportSheetName}" is empty or has no headers. Nothing to verify.`, ui.ButtonSet.OK);
     Logger.log(`INFO: Report sheet "${generatedReportSheetName}" is empty. Nothing to verify.`);
     return;
   }
   
   const reportActualHeaders = reportContent[0].map(h => h ? h.toString().trim() : "");
   const repEvalIdColIdx = reportActualHeaders.indexOf("evaluatorId");
-  const repEvalUnitColIdx = reportActualHeaders.indexOf("evaluatorUnitContext"); // Matches header from findStudents...
+  const repEvalUnitColIdx = reportActualHeaders.indexOf("evaluatorUnitContext"); 
   const repPeerNotAssessedIdColIdx = reportActualHeaders.indexOf("peerNotAssessedId");
 
   if (repEvalIdColIdx === -1 || repEvalUnitColIdx === -1 || repPeerNotAssessedIdColIdx === -1) {
@@ -380,22 +391,20 @@ function verifyMissingAssessmentsReport() {
       return;
   }
 
-  let verificationResults = []; // Stores discrepancy details
+  let verificationResults = []; 
   let discrepanciesFound = 0;
   let correctlyMissingOrNA = 0;
   let totalCheckedInReport = 0;
 
-  // Start from row 1 of reportContent (sheet row 2) to skip headers
   for (let i = 1; i < reportContent.length; i++) { 
     const reportRow = reportContent[i];
-    if (!reportRow || reportRow.every(cell => cell === "")) continue; // Skip genuinely blank rows
+    if (!reportRow || reportRow.every(cell => (cell === null || cell === undefined || cell.toString().trim() === ""))) continue; 
 
     const reportedEvaluatorId = reportRow[repEvalIdColIdx] ? reportRow[repEvalIdColIdx].toString().trim() : null;
     const reportedEvaluatorUnit = reportRow[repEvalUnitColIdx] ? reportRow[repEvalUnitColIdx].toString().trim().toUpperCase() : null;
     const reportedPeerNotAssessedId = reportRow[repPeerNotAssessedIdColIdx] ? reportRow[repPeerNotAssessedIdColIdx].toString().trim() : null;
 
-    // Handle the "All students appear to have assessed..." message
-    if (i === 1 && reportRow[0] && reportRow[0].toString().toLowerCase().includes("all students appear to have assessed")) {
+    if (i === 1 && reportRow[0] && typeof reportRow[0] === 'string' && reportRow[0].toLowerCase().includes("all students appear to have assessed")) {
         Logger.log("Verification: Report sheet indicates 'All students assessed'. No specific entries to check.");
         break; 
     }
@@ -404,7 +413,6 @@ function verifyMissingAssessmentsReport() {
       Logger.log(`Verification: Skipping malformed data row ${i+1} in report: ${reportRow.join(', ')} (Missing ID, Unit, or PeerID).`);
       continue;
     }
-    // Handle cases where the report itself says "N/A" (e.g., student has no unit)
     if (reportedPeerNotAssessedId.toUpperCase() === "N/A" || reportedPeerNotAssessedId.toUpperCase() === "N/A (CHECK SETUP)") {
         totalCheckedInReport++; 
         correctlyMissingOrNA++; 
@@ -436,7 +444,7 @@ function verifyMissingAssessmentsReport() {
     }
   }
 
-  var summarySheet = ss.getSheetByName(verificationSummarySheetName);
+  let summarySheet = ss.getSheetByName(verificationSummarySheetName); // Changed: var to let
   if (summarySheet) { 
     summarySheet.clearContents().clearFormats(); 
     Logger.log(`Sheet "${verificationSummarySheetName}" found and cleared.`);
@@ -476,12 +484,12 @@ function verifyMissingAssessmentsReport() {
         });
         try { summarySheet.autoResizeColumns(1, discrepancyHeaders.length); } catch (e) { Logger.log(`Warning: autoResizeColumns for discrepancies failed. ${e.message}`);}
     }
-  } else if (totalCheckedInReport > 0 || (reportContent.length >= 2 && reportContent[1][0] && reportContent[1][0].toString().toLowerCase().includes("all students appear"))) {
+  } else if (totalCheckedInReport > 0 || (reportContent.length >= 2 && typeof reportContent[1][0] === 'string' && reportContent[1][0].toLowerCase().includes("all students appear"))) {
     summarySheet.appendRow(["No discrepancies found. The 'Detailed Missing Assessments' report appears consistent with current V2 data."]);
-  } else if (reportContent.length <=1) { // Only headers or empty
-     summarySheet.appendRow(["The 'Detailed Missing Assessments' report was empty (or only had headers). Nothing specific to verify."]);
+  } else if (reportContent.length <=1 && totalCheckedInReport === 0) { 
+     summarySheet.appendRow(["The 'Detailed Missing Assessments' report was empty (or only had headers), and no entries were checked."]);
   } else {
-    summarySheet.appendRow(["No specific missing assessment entries were found in the source report to verify (V2 Parser context)."]);
+    summarySheet.appendRow(["No specific missing assessment entries were found in the source report to verify, or no discrepancies noted (V2 Parser context)."]);
   }
   
   Logger.log(`Verification Complete. Summary written to "${verificationSummarySheetName}". Discrepancies: ${discrepanciesFound}.`);

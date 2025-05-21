@@ -5,6 +5,7 @@
  * This special function runs when the spreadsheet is opened.
  * It adds a custom menu to the Google Sheets UI with a logical workflow order.
  */
+// eslint-disable-next-line no-unused-vars
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   

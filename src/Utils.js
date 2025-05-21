@@ -1,23 +1,66 @@
+/* global PA_QUESTION_CONFIG_SHEET_NAME, createQuestion, parseRawSurveyData */
+
+/**
+ * @file Utils.js
+ * @description This file contains general-purpose helper and utility functions used across
+ * the Peer Assessment system. It includes functions for data validation (emails, units),
+ * mathematical calculations (median, mean, standard deviation), and dedicated test functions
+ * for developers to verify parts of the system.
+ *
+ * @requires Config.gs (for sheet name constants like PA_QUESTION_CONFIG_SHEET_NAME)
+ * @requires Models.gs (for createQuestion function, if getQuestionDefinitions here is primary)
+ * @requires Parser_V2.js (for parseRawSurveyData function, used in testNewParser)
+ */
+
 // ===================================================================================
 // HELPER FUNCTIONS
 // ===================================================================================
+
+/**
+ * Validates if the given email string matches the SHU (Shih Hsin University) student email format.
+ * Expected format: one lowercase letter, followed by 9 digits, then '@mail.shu.edu.tw'.
+ * @param {string} email The email string to validate.
+ * @returns {boolean} True if the email is a valid SHU format, false otherwise.
+ */
+// // eslint-disable-next-line no-unused-vars
 function isValidShuEmail(email) {
   if (typeof email !== 'string') return false;
   const emailPattern = /^[a-z]{1}[0-9]{9}@mail\.shu\.edu\.tw$/;
   return emailPattern.test(email.toLowerCase());
 }
 
+/**
+ * Extracts the student ID (the part before '@') from a valid SHU email address.
+ * The extracted ID is converted to uppercase.
+ * @param {string} email The SHU email address.
+ * @returns {string|null} The uppercase student ID, or null if the email is not a valid SHU format.
+ */
+// eslint-disable-next-line no-unused-vars
 function extractStudentIdFromEmail(email) {
-  if (!isValidShuEmail(email)) return null;
+  if (!isValidShuEmail(email)) return null; // Calls local isValidShuEmail
   const idPart = email.split('@')[0];
   return idPart.toUpperCase(); 
 }
 
+/**
+ * Validates if the given unit string is a valid single-letter production unit (A, B, C, or D).
+ * Case-insensitive check.
+ * @param {string} unit The unit string to validate.
+ * @returns {boolean} True if the unit is valid, false otherwise.
+ */
+// eslint-disable-next-line no-unused-vars
 function isValidProductionUnit(unit) {
     if (typeof unit !== 'string' || unit.length !== 1) return false; 
     return ["A", "B", "C", "D"].includes(unit.toUpperCase());
 }
 
+/**
+ * Calculates the median value from an array of numbers.
+ * Returns 0 if the array is empty or null.
+ * @param {number[]} arr The array of numbers.
+ * @returns {number} The median of the array.
+ */
+// eslint-disable-next-line no-unused-vars
 function calculateMedianFromArray(arr) {
   if (!arr || arr.length === 0) return 0;
   const sortedArr = arr.slice().sort((a, b) => a - b); 
@@ -29,101 +72,132 @@ function calculateMedianFromArray(arr) {
   }
 }
 
+/**
+ * Calculates the mean (average) from an array of numbers.
+ * Returns 0 if the array is empty or null.
+ * @param {number[]} arr The array of numbers.
+ * @returns {number} The mean of the array.
+ */
+// // eslint-disable-next-line no-unused-vars
 function calculateMean(arr) {
     if (!arr || arr.length === 0) return 0;
     return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
+/**
+ * Calculates the population standard deviation from an array of numbers.
+ * An optional mean can be provided; otherwise, it's calculated.
+ * Returns 0 if the array has fewer than 2 elements or is null.
+ * @param {number[]} arr The array of numbers.
+ * @param {number} [mean] - Optional pre-calculated mean of the array.
+ * @returns {number} The population standard deviation.
+ */
+// eslint-disable-next-line no-unused-vars
 function calculateStdDev(arr, mean) {
     if (!arr || arr.length < 2) return 0; 
     const n = arr.length;
-    const meanToUse = (mean === undefined) ? calculateMean(arr) : mean;
+    const meanToUse = (mean === undefined) ? calculateMean(arr) : mean; // Calls local calculateMean
     return Math.sqrt(arr.map(x => Math.pow(x - meanToUse, 2)).reduce((a, b) => a + b) / n);
 }
 
-
 /**
  * Reads the 'PaQuestionConfig' sheet and returns an object map of Question objects.
+ * This version of the function resides in Utils.js and is primarily for testing purposes via `testGetQuestions`.
+ * The canonical version used by the main parser is in Parser_V2.js.
  * Assumes PaQuestionConfig has PascalCase headers: QuestionID, QuestionText, QuestionType, Choices, InstructionalComment.
- * @return {object} An object where keys are questionIds (e.g., "Q01") and values are the question objects. Returns empty object on error.
+ * @returns {Object<string, object>} An object where keys are questionIds (e.g., "Q01") and values are Question objects.
+ *                                  Returns an empty object on error.
  */
-function getQuestionDefinitions() {
+// // eslint-disable-next-line no-unused-vars
+function getQuestionDefinitions() { // This is Utils.js version
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const ui = SpreadsheetApp.getUi(); // For alerts
-  Logger.log("getQuestionDefinitions: Starting to read PaQuestionConfig.");
+  const ui = SpreadsheetApp.getUi(); 
+  Logger.log("Utils.getQuestionDefinitions: Starting to read PaQuestionConfig."); // Clarified source
 
-  const configSheetName = PA_QUESTION_CONFIG_SHEET_NAME; // From Config.gs
+  const configSheetName = PA_QUESTION_CONFIG_SHEET_NAME; 
   const sheet = ss.getSheetByName(configSheetName);
-  let questionsMap = {}; // Use map for direct lookup by questionId
+  let questionsMap = {}; 
 
   if (!sheet) {
-    Logger.log(`getQuestionDefinitions ERROR: Question config sheet "${configSheetName}" not found.`);
+    Logger.log(`Utils.getQuestionDefinitions ERROR: Question config sheet "${configSheetName}" not found.`);
     ui.alert("Configuration Error", `The question configuration sheet named "${configSheetName}" was not found. Please create and populate it.`, ui.ButtonSet.OK);
-    return questionsMap; // Return empty map
+    return questionsMap; 
   }
 
   const data = sheet.getDataRange().getValues();
-  if (data.length < 2) { // Must have header + at least one question
-    Logger.log(`getQuestionDefinitions WARNING: Sheet "${configSheetName}" is empty or has only headers.`);
+  if (data.length < 2) { 
+    Logger.log(`Utils.getQuestionDefinitions WARNING: Sheet "${configSheetName}" is empty or has only headers.`);
     ui.alert("Configuration Warning", `The question configuration sheet "${configSheetName}" appears to be empty or only has headers. No questions loaded.`, ui.ButtonSet.OK);
     return questionsMap;
   }
 
-  const headers = data[0].map(h => h ? h.toString().trim() : ""); // Get headers, trim, handle potential nulls
+  const headers = data[0].map(h => h ? h.toString().trim() : ""); 
   
-  // Find column indices by PascalCase header names (as per your PaQuestionConfig example)
   const idColConfigIdx = headers.indexOf("QuestionID");
   const textColConfigIdx = headers.indexOf("QuestionText");
   const typeColConfigIdx = headers.indexOf("QuestionType");
   const choicesColConfigIdx = headers.indexOf("Choices");
   const instructionColConfigIdx = headers.indexOf("InstructionalComment");
 
-  // Validate essential headers
   if (idColConfigIdx === -1 || textColConfigIdx === -1 || typeColConfigIdx === -1 ) {
-    Logger.log(`getQuestionDefinitions ERROR: Required headers (QuestionID, QuestionText, QuestionType) not found in "${configSheetName}". Found headers: [${headers.join(', ')}]`);
+    Logger.log(`Utils.getQuestionDefinitions ERROR: Required headers (QuestionID, QuestionText, QuestionType) not found in "${configSheetName}". Found headers: [${headers.join(', ')}]`);
     ui.alert("Configuration Error", `Required headers (QuestionID, QuestionText, QuestionType) missing in "${configSheetName}". Please check the sheet.`, ui.ButtonSet.OK);
-    return questionsMap; // Return empty map
+    return questionsMap; 
   }
 
-  for (let i = 1; i < data.length; i++) { // Start from 1 to skip header row
+  for (let i = 1; i < data.length; i++) { 
     const row = data[i];
-    const qId = row[idColConfigIdx] ? row[idColConfigIdx].toString().trim() : null;
+    const qId = row[idColConfigIdx] ? row[idColConfigIdx].toString().trim().toUpperCase() : null; // Added toUpperCase() for consistency
     const qText = row[textColConfigIdx] ? row[textColConfigIdx].toString().trim() : null;
     
-    if (qId && qText) { // Only proceed if ID and Text are present
-      const qType = (typeColConfigIdx !== -1 && row[typeColConfigIdx]) ? row[typeColConfigIdx].toString().trim() : "LikertScale"; // Default
+    if (qId && qText) { 
+      const qType = (typeColConfigIdx !== -1 && row[typeColConfigIdx]) ? row[typeColConfigIdx].toString().trim() : "LikertScale"; 
       const qChoices = (choicesColConfigIdx !== -1 && row[choicesColConfigIdx]) ? row[choicesColConfigIdx].toString().trim() : "";
       const qInstruction = (instructionColConfigIdx !== -1 && row[instructionColConfigIdx]) ? row[instructionColConfigIdx].toString().trim() : "";
 
       let questionObject = createQuestion(qId, qText, qInstruction, qType, qChoices); 
-      if (questionObject && questionObject.isValid()) { // Use the isValid method if you have one
-        questionsMap[questionObject.questionId] = questionObject; // Key by QID (e.g., "Q01")
+      if (questionObject && questionObject.isValid()) { 
+        questionsMap[questionObject.questionId] = questionObject; 
       } else {
-        Logger.log(`getQuestionDefinitions: Skipped creating question from row ${i+1} due to invalid data or createQuestion failure. ID='${qId}', Text='${qText}'`);
+        Logger.log(`Utils.getQuestionDefinitions: Skipped creating question from row ${i+1} due to invalid data or createQuestion failure. ID='${qId}', Text='${qText}'`);
       }
-    } else if (qId || qText) { // Log if one is present but not the other (potential data issue)
-        Logger.log(`getQuestionDefinitions: Skipped row ${i+1} in "${configSheetName}" due to missing QuestionID or QuestionText.`);
+    } else if (qId || qText) { 
+        Logger.log(`Utils.getQuestionDefinitions: Skipped row ${i+1} in "${configSheetName}" due to missing QuestionID or QuestionText.`);
     }
   }
-  Logger.log(`getQuestionDefinitions: Loaded ${Object.keys(questionsMap).length} question definitions from "${configSheetName}".`);
+  Logger.log(`Utils.getQuestionDefinitions: Loaded ${Object.keys(questionsMap).length} question definitions from "${configSheetName}".`);
   return questionsMap;
 }
 
+/**
+ * Test function to load and log question definitions using the `getQuestionDefinitions`
+ * function within this Utils.js file.
+ * Intended for developer use via the Apps Script editor.
+ * @function testGetQuestions
+ */
+// eslint-disable-next-line no-unused-vars
 function testGetQuestions() {
   Logger.clear();
-  const questions = getQuestionDefinitions();
+  const questions = getQuestionDefinitions(); // Calls local getQuestionDefinitions
   if (Object.keys(questions).length > 0) {
-    Logger.log(`Successfully loaded ${Object.keys(questions).length} questions.`);
+    Logger.log(`Successfully loaded ${Object.keys(questions).length} questions (using Utils.getQuestionDefinitions).`);
     Logger.log("Sample Question (Q01): " + JSON.stringify(questions["Q01"], null, 2));
     Logger.log("Sample Question (Last one): " + JSON.stringify(questions[Object.keys(questions).pop()], null, 2));
   } else {
-    Logger.log("No questions were loaded by getQuestionDefinitions.");
+    Logger.log("No questions were loaded by Utils.getQuestionDefinitions.");
   }
 }
 
+/**
+ * Test function for the V2 parser (`parseRawSurveyData` from Parser_V2.js).
+ * Logs counts of parsed students, questions, and responses, and sample data.
+ * Intended for developer use via the Apps Script editor.
+ * @function testNewParser
+ */
+// eslint-disable-next-line no-unused-vars
 function testNewParser() {
   Logger.clear();
-  const result = parseRawSurveyData(); // This now calls your new V2 parser
+  const result = parseRawSurveyData(); // Calls parseRawSurveyData from Parser_V2.js
   if (result) {
     Logger.log(`TestNewParser Results:`);
     Logger.log(`Students Parsed (from Master List): ${Object.keys(result.students).length}`);

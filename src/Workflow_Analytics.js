@@ -1,15 +1,50 @@
-// In Workflow_Analytics.gs
+/* global PA_EVALUATOR_ANALYTICS_SHEET_NAME, parseRawSurveyData, calculateMedianFromArray, calculateMean, calculateStdDev */
 
 /**
- * Generates evaluator analytics and calculates weights.
- * - Uses camelCase headers for its output sheet.
- * - Creates/clears the output sheet and populates headers.
- * - Returns the calculated evaluatorWeights object.
+ * @file Workflow_Analytics.js
+ * @description This file orchestrates the generation of evaluator analytics and calculates
+ * evaluator weights based on peer assessment submission data. It reads parsed data,
+ * computes various metrics about each evaluator's behavior (e.g., average scores given,
+ * consistency, comment frequency), and then applies a weighting algorithm.
+ * The results, including analytics and calculated weights, are outputted to the
+ * 'PaEvaluatorAnalytics' Google Sheet. This function is typically invoked from the
+ * custom menu in Google Sheets.
+ *
+ * @requires Config.gs (for PA_EVALUATOR_ANALYTICS_SHEET_NAME)
+ * @requires Parser_V2.js (for parseRawSurveyData function)
+ * @requires Utils.js (for calculateMedianFromArray, calculateMean, calculateStdDev functions)
  */
+
+// In Workflow_Analytics.js // Your existing comment
+
+/**
+ * Generates detailed analytics for each evaluator based on their submitted peer assessments
+ * and calculates a "weight" for each evaluator.
+ *
+ * The process involves:
+ * 1. Parsing raw submission data using {@link parseRawSurveyData}.
+ * 2. Initializing metrics for each active student (potential evaluator).
+ * 3. Aggregating basic data: scores given, comments made, etc.
+ * 4. Calculating group medians for items to enable deviation metrics.
+ * 5. Calculating advanced metrics: average score, standard deviation of scores,
+ *    score range, percentage of max/min/mid scores, intra-peer consistency (standard deviation),
+ *    average deviation from group median for items, comment frequency, and average comment length.
+ * 6. Applying a heuristic algorithm to calculate an evaluator weight (0.0 to 1.0)
+ *    based on these metrics, aiming to adjust for potential biases or rating styles.
+ * 7. Outputting all calculated analytics and weights to the 'PaEvaluatorAnalytics' sheet.
+ *
+ * This function is typically called from a custom menu item.
+ *
+ * @function generateEvaluatorAnalyticsAndWeights
+ * @returns {Object<string, number>|null} An object where keys are evaluator student IDs and values
+ *                                        are their calculated weights (e.g., `{ "S123...": 0.85, ... }`).
+ *                                        Returns `null` if critical errors occur (e.g., data parsing failure).
+ */
+// eslint-disable-next-line no-unused-vars
 function generateEvaluatorAnalyticsAndWeights() {
-  var ui = SpreadsheetApp.getUi();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  Logger.clear();
+  const ui = SpreadsheetApp.getUi(); // SpreadsheetApp, Ui are from eslint.config.mjs
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  Logger.clear(); // Logger is from eslint.config.mjs
   Logger.log("--- Starting Evaluator Analytics & Weight Generation (camelCase Headers) ---");
 
   const analyticsSheetName = PA_EVALUATOR_ANALYTICS_SHEET_NAME; 
@@ -20,10 +55,15 @@ function generateEvaluatorAnalyticsAndWeights() {
     Logger.log("ERROR: parseRawSurveyData did not return expected data for analytics.");
     return null; 
   }
-  const { students: allStudents, questions, responses } = parsedData; 
+  // In a real project, you might destructure with more specific JSDoc types if defined
+  // /** @type {Object<string, Student>} */ const allStudents = parsedData.students; 
+  // /** @type {Object<string, Question>} */ const questions = parsedData.questions;
+  // /** @type {Response[]} */ const responses = parsedData.responses;
+  const { students: allStudents, questions: _questions, responses } = parsedData; // _questions to avoid no-unused-vars if not directly used after destructuring
+  // If 'questions' from parsedData is truly not used in this function, consider removing it from destructuring or prefixing with _
 
   Logger.log(`Analytics - Parsed Students Count: ${Object.keys(allStudents).length}`);
-  Logger.log(`Analytics - Parsed Questions Count: ${Object.keys(questions).length}`);
+  // Logger.log(`Analytics - Parsed Questions Count: ${Object.keys(_questions).length}`); // Using _questions
   Logger.log(`Analytics - Parsed Responses Count: ${responses.length}`);
 
   if (Object.keys(allStudents).length === 0 ) {
@@ -31,7 +71,7 @@ function generateEvaluatorAnalyticsAndWeights() {
       return null; 
   }
 
-  var reportSheet = ss.getSheetByName(analyticsSheetName);
+  let reportSheet = ss.getSheetByName(analyticsSheetName); // Changed: var to let
   if (reportSheet) { 
     reportSheet.clearContents().clearFormats(); 
   } else { 
@@ -53,14 +93,16 @@ function generateEvaluatorAnalyticsAndWeights() {
 
   let evaluatorMetrics = {}; 
   for (const studentId in allStudents) {
-    if (allStudents.hasOwnProperty(studentId) && allStudents[studentId] && 
+    // It's good practice to check hasOwnProperty when iterating with for...in, though for objects created by Object.keys/map it's usually fine.
+    if (Object.prototype.hasOwnProperty.call(allStudents, studentId) && allStudents[studentId] && 
         !studentId.startsWith("UNKNOWNID_") && /^[A-Z]{1}[0-9]{9}$/.test(studentId)) {
       evaluatorMetrics[studentId] = {
-        studentId: studentId,
+        studentId: studentId, // This is studentObject.studentId from the parsed data
         studentName: allStudents[studentId].studentName || `[Name missing for ${studentId}]`, 
         scoresGivenValues: [], commentsMadeCount: 0, assessmentsWhereCommentProvided: 0, 
         totalScoredAssessments: 0, commentLengths: [],
-        distinctScoreValuesUsed: new Set(), absDeviationsFromGroupMedianArray: [] // Changed name for clarity
+        distinctScoreValuesUsed: new Set(), // Set is a built-in JS global
+        absDeviationsFromGroupMedianArray: [] 
       };
     }
   }
@@ -72,6 +114,8 @@ function generateEvaluatorAnalyticsAndWeights() {
       return; 
     }
     const evaluatorId = response.responseByStudentId;
+    // Ensure evaluatedStudentId and responseToQuestionId are present to form a valid key
+    if (!response.evaluatedStudentId || !response.responseToQuestionId) return; 
     const evalKey = `${evaluatorId}_${response.evaluatedStudentId}_${response.responseToQuestionId}`;
 
     if (response.responseType === "SCORE" && typeof response.responseValue === 'number' && !isNaN(response.responseValue)) {
@@ -80,15 +124,16 @@ function generateEvaluatorAnalyticsAndWeights() {
       evaluatorMetrics[evaluatorId].distinctScoreValuesUsed.add(response.responseValue);
       if (!scoreCommentPairTracker[evalKey]) scoreCommentPairTracker[evalKey] = { hasScore: false, hasComment: false };
       scoreCommentPairTracker[evalKey].hasScore = true;
-    } else if (response.responseType === "COMMENT" && response.responseValue && response.responseValue.toString().trim() !== "") {
+    } else if (response.responseType === "COMMENT" && typeof response.responseValue === 'string' && response.responseValue.trim() !== "") { // Ensure comment has content
       evaluatorMetrics[evaluatorId].commentsMadeCount++;
-      evaluatorMetrics[evaluatorId].commentLengths.push(response.responseValue.toString().trim().length);
+      evaluatorMetrics[evaluatorId].commentLengths.push(response.responseValue.trim().length);
       if (!scoreCommentPairTracker[evalKey]) scoreCommentPairTracker[evalKey] = { hasScore: false, hasComment: false };
       scoreCommentPairTracker[evalKey].hasComment = true;
     }
   });
 
   for (const key in scoreCommentPairTracker) {
+    if (Object.prototype.hasOwnProperty.call(scoreCommentPairTracker, key)) { // Good practice for for...in
       const parts = key.split('_');
       const evaluatorId = parts[0];
       if (!evaluatorMetrics[evaluatorId]) continue; 
@@ -96,6 +141,7 @@ function generateEvaluatorAnalyticsAndWeights() {
       if (pair.hasScore && pair.hasComment) { 
           evaluatorMetrics[evaluatorId].assessmentsWhereCommentProvided++;
       }
+    }
   }
   Logger.log("Analytics: Basic response aggregation complete.");
 
@@ -106,80 +152,91 @@ function generateEvaluatorAnalyticsAndWeights() {
           const itemKey = `${r1.evaluatedStudentId}_${r1.responseToQuestionId}`;
           if (!scoresByItemFromOthers[itemKey]) scoresByItemFromOthers[itemKey] = [];
           
+          // Efficiently find other scores for the same item
           responses.forEach(r2 => { 
-              if (r2.responseByStudentId && 
-                  r2.responseType === "SCORE" && typeof r2.responseValue === 'number' && 
-                  r1.evaluatedStudentId === r2.evaluatedStudentId &&
-                  r1.responseToQuestionId === r2.responseToQuestionId &&
-                  r1.responseByStudentId !== r2.responseByStudentId) { 
+              if (r2.responseByStudentId && r2.responseByStudentId !== r1.responseByStudentId && // Different evaluator
+                  r2.evaluatedStudentId === r1.evaluatedStudentId &&    // Same evaluated student
+                  r2.responseToQuestionId === r1.responseToQuestionId && // Same question
+                  r2.responseType === "SCORE" && typeof r2.responseValue === 'number' && !isNaN(r2.responseValue)) { 
                   scoresByItemFromOthers[itemKey].push(r2.responseValue);
               }
           });
-          // Remove duplicates from scores by others for the same item (unlikely but good practice)
-          if (scoresByItemFromOthers[itemKey].length > 0) {
-            scoresByItemFromOthers[itemKey] = [...new Set(scoresByItemFromOthers[itemKey])];
-          }
+          // No need to create a new Set for each r1 if scoresByItemFromOthers[itemKey] accumulates all relevant scores.
+          // A Set can be applied once per itemKey after the loops if duplicates are a concern from the source data itself.
       }
   });
+
+  // Deduplicate and calculate medians
   let groupMediansByItem = {}; 
   for(const itemKey in scoresByItemFromOthers){
-      if (scoresByItemFromOthers[itemKey].length > 0) {
-        groupMediansByItem[itemKey] = calculateMedianFromArray(scoresByItemFromOthers[itemKey]); 
+    if (Object.prototype.hasOwnProperty.call(scoresByItemFromOthers, itemKey)) { // Good practice
+      const uniqueScores = [...new Set(scoresByItemFromOthers[itemKey])]; // Deduplicate here
+      if (uniqueScores.length > 0) {
+        groupMediansByItem[itemKey] = calculateMedianFromArray(uniqueScores); 
       }
+    }
   }
   Logger.log("Analytics: Group medians for deviation metric calculated.");
   
   // --- Calculate advanced metrics for each evaluator ---
   for (const evaluatorId in evaluatorMetrics) {
-    const metrics = evaluatorMetrics[evaluatorId];
-    
-    if (metrics.scoresGivenValues.length > 0) {
-        metrics.avgScoreGiven = calculateMean(metrics.scoresGivenValues);
-        metrics.stdDevScoresGiven = metrics.scoresGivenValues.length >= 2 ? calculateStdDev(metrics.scoresGivenValues, metrics.avgScoreGiven) : 0;
-        const minVal = Math.min(...metrics.scoresGivenValues);
-        const maxVal = Math.max(...metrics.scoresGivenValues);
-        metrics.rangeScoresUsed = maxVal - minVal;
-        metrics.percentMaxScore = (metrics.scoresGivenValues.filter(s => s === 4).length / metrics.scoresGivenValues.length) * 100;
-        metrics.percentMinScore = (metrics.scoresGivenValues.filter(s => s === 1).length / metrics.scoresGivenValues.length) * 100;
-        metrics.percentMidScores = (metrics.scoresGivenValues.filter(s => s === 2 || s === 3).length / metrics.scoresGivenValues.length) * 100;
-    } else {
-        metrics.avgScoreGiven = 0; 
-        metrics.stdDevScoresGiven = 0; 
-        metrics.rangeScoresUsed = 0;
-        metrics.percentMaxScore = 0; 
-        metrics.percentMinScore = 0; 
-        metrics.percentMidScores = 0;
-    }
+    if (Object.prototype.hasOwnProperty.call(evaluatorMetrics, evaluatorId)) { // Good practice
+      const metrics = evaluatorMetrics[evaluatorId];
+      
+      if (metrics.scoresGivenValues.length > 0) {
+          metrics.avgScoreGiven = calculateMean(metrics.scoresGivenValues);
+          metrics.stdDevScoresGiven = metrics.scoresGivenValues.length >= 2 ? calculateStdDev(metrics.scoresGivenValues, metrics.avgScoreGiven) : 0;
+          // Math.min/max on empty array is Infinity/-Infinity, handle this if scoresGivenValues could be empty (already handled by outer if)
+          const minVal = Math.min(...metrics.scoresGivenValues);
+          const maxVal = Math.max(...metrics.scoresGivenValues);
+          metrics.rangeScoresUsed = maxVal - minVal;
+          // Assuming scores are 1-4 or 1-5. If max possible score is different, adjust '4'
+          const MAX_POSSIBLE_SCORE = 4; // Or 5, define this as a constant if it varies
+          const MIN_POSSIBLE_SCORE = 1;
+          metrics.percentMaxScore = (metrics.scoresGivenValues.filter(s => s === MAX_POSSIBLE_SCORE).length / metrics.scoresGivenValues.length) * 100;
+          metrics.percentMinScore = (metrics.scoresGivenValues.filter(s => s === MIN_POSSIBLE_SCORE).length / metrics.scoresGivenValues.length) * 100;
+          metrics.percentMidScores = (metrics.scoresGivenValues.filter(s => s > MIN_POSSIBLE_SCORE && s < MAX_POSSIBLE_SCORE).length / metrics.scoresGivenValues.length) * 100;
+      } else {
+          metrics.avgScoreGiven = 0; 
+          metrics.stdDevScoresGiven = 0; 
+          metrics.rangeScoresUsed = 0;
+          metrics.percentMaxScore = 0; 
+          metrics.percentMinScore = 0; 
+          metrics.percentMidScores = 0;
+      }
 
-    let intraPeerStdDevsAccumulator = []; 
-    let perPeerScoresGiven = {}; 
-    responses.forEach(r => {
-        if (r.responseByStudentId === evaluatorId && r.responseType === "SCORE" && typeof r.responseValue === 'number' && r.evaluatedStudentId) {
-            if (!perPeerScoresGiven[r.evaluatedStudentId]) perPeerScoresGiven[r.evaluatedStudentId] = [];
-            perPeerScoresGiven[r.evaluatedStudentId].push(r.responseValue);
-        }
-    });
-    for (const peerId in perPeerScoresGiven) {
-        if (perPeerScoresGiven[peerId].length >= 2) { 
-            intraPeerStdDevsAccumulator.push(calculateStdDev(perPeerScoresGiven[peerId]));
-        }
-    }
-    metrics.avgIntraPeerSd = intraPeerStdDevsAccumulator.length > 0 ? calculateMean(intraPeerStdDevsAccumulator) : 0;
-     
-    let absDeviationsTempArray = []; 
-    responses.forEach(r => {
-        if (r.responseByStudentId === evaluatorId && r.responseType === "SCORE" && typeof r.responseValue === 'number' && r.evaluatedStudentId && r.responseToQuestionId) {
-            const itemKey = `${r.evaluatedStudentId}_${r.responseToQuestionId}`;
-            if (groupMediansByItem[itemKey] !== undefined && typeof groupMediansByItem[itemKey] === 'number') { 
-                absDeviationsTempArray.push(Math.abs(r.responseValue - groupMediansByItem[itemKey]));
+      let intraPeerStdDevsAccumulator = []; 
+      let perPeerScoresGiven = {}; 
+      responses.forEach(r => {
+          if (r.responseByStudentId === evaluatorId && r.responseType === "SCORE" && typeof r.responseValue === 'number' && r.evaluatedStudentId) {
+              if (!perPeerScoresGiven[r.evaluatedStudentId]) perPeerScoresGiven[r.evaluatedStudentId] = [];
+              perPeerScoresGiven[r.evaluatedStudentId].push(r.responseValue);
+          }
+      });
+      for (const peerId in perPeerScoresGiven) {
+          if (Object.prototype.hasOwnProperty.call(perPeerScoresGiven, peerId)) { // Good practice
+            if (perPeerScoresGiven[peerId].length >= 2) { 
+                intraPeerStdDevsAccumulator.push(calculateStdDev(perPeerScoresGiven[peerId]));
             }
-        }
-    });
-    metrics.absDeviationsFromGroupMedianArray = absDeviationsTempArray; 
-    metrics.avgAbsDevFromGroupMedian = metrics.absDeviationsFromGroupMedianArray.length > 0 ? calculateMean(metrics.absDeviationsFromGroupMedianArray) : 0;
-     
-    metrics.percentScoresWithComment = metrics.totalScoredAssessments > 0 ? (metrics.assessmentsWhereCommentProvided / metrics.totalScoredAssessments) * 100 : 0;
-    metrics.avgCommentLength = metrics.commentLengths.length > 0 ? calculateMean(metrics.commentLengths) : 0;
+          }
+      }
+      metrics.avgIntraPeerSd = intraPeerStdDevsAccumulator.length > 0 ? calculateMean(intraPeerStdDevsAccumulator) : 0;
+      
+      let absDeviationsTempArray = []; 
+      responses.forEach(r => {
+          if (r.responseByStudentId === evaluatorId && r.responseType === "SCORE" && typeof r.responseValue === 'number' && r.evaluatedStudentId && r.responseToQuestionId) {
+              const itemKey = `${r.evaluatedStudentId}_${r.responseToQuestionId}`;
+              if (groupMediansByItem[itemKey] !== undefined && typeof groupMediansByItem[itemKey] === 'number') { 
+                  absDeviationsTempArray.push(Math.abs(r.responseValue - groupMediansByItem[itemKey]));
+              }
+          }
+      });
+      // metrics.absDeviationsFromGroupMedianArray = absDeviationsTempArray; // Storing the array might be much if not used later
+      metrics.avgAbsDevFromGroupMedian = absDeviationsTempArray.length > 0 ? calculateMean(absDeviationsTempArray) : 0;
+      
+      metrics.percentScoresWithComment = metrics.totalScoredAssessments > 0 ? (metrics.assessmentsWhereCommentProvided / metrics.totalScoredAssessments) * 100 : 0;
+      metrics.avgCommentLength = metrics.commentLengths.length > 0 ? calculateMean(metrics.commentLengths) : 0;
+    }
   }
   Logger.log(`Analytics: Advanced metrics calculated for all evaluators.`);
 
@@ -187,57 +244,64 @@ function generateEvaluatorAnalyticsAndWeights() {
   let evaluatorWeights = {}; 
   Logger.log("Analytics: Calculating evaluator weights...");
   for (const evaluatorId in evaluatorMetrics) {
-    const metrics = evaluatorMetrics[evaluatorId];
-    let weight = 1.0; 
-    const numScoresGiven = metrics.scoresGivenValues.length;
+    if (Object.prototype.hasOwnProperty.call(evaluatorMetrics, evaluatorId)) { // Good practice
+      const metrics = evaluatorMetrics[evaluatorId];
+      let weight = 1.0; 
+      const numScoresGiven = metrics.scoresGivenValues.length;
 
-    if (numScoresGiven === 0) {
-        weight = 0.0;
-    } else if (numScoresGiven < 5) { 
-        weight = 0.4; 
-    } else { 
-        if (metrics.avgScoreGiven > 3.5) weight -= 0.25;  
-        else if (metrics.avgScoreGiven > 3.2) weight -= 0.15; 
-        if (metrics.avgScoreGiven < 2.0) weight -= 0.25;  
-        else if (metrics.avgScoreGiven < 2.3) weight -= 0.15; 
-        if (metrics.percentMaxScore > 70) weight -= 0.10; 
-        if (metrics.percentMaxScore > 90) weight -= 0.15; 
-        if (metrics.percentMinScore < 10 && metrics.avgScoreGiven > 3.2) weight -= 0.10;
-        if (metrics.distinctScoreValuesUsed.size === 1) weight -= 0.30; 
-        else if (metrics.distinctScoreValuesUsed.size === 2) weight -= 0.20;
-        if (metrics.distinctScoreValuesUsed.size >= 3 && metrics.stdDevScoresGiven < 0.50) weight -= 0.10; 
-        if (metrics.avgIntraPeerSd < 0.25 && metrics.totalScoredAssessments >= 10) weight -= 0.15;
-        if (metrics.avgAbsDevFromGroupMedian > 0.70 && numScoresGiven >= 10) weight -= 0.15;
-        if (metrics.percentScoresWithComment > 30) weight += 0.05;
-        if (metrics.percentScoresWithComment > 50) weight += 0.05; 
+      if (numScoresGiven === 0) {
+          weight = 0.0;
+      } else if (numScoresGiven < 5) { 
+          weight = 0.4; 
+      } else { 
+          // Example weighting logic - this is highly configurable
+          if (metrics.avgScoreGiven > 3.5) weight -= 0.25;  
+          else if (metrics.avgScoreGiven > 3.2) weight -= 0.15; 
+          if (metrics.avgScoreGiven < 2.0) weight -= 0.25;  
+          else if (metrics.avgScoreGiven < 2.3) weight -= 0.15; 
+          
+          if (metrics.percentMaxScore > 70) weight -= 0.10; 
+          if (metrics.percentMaxScore > 90) weight -= 0.15; // Cumulative deduction
+          
+          if (metrics.percentMinScore < 10 && metrics.avgScoreGiven > 3.2) weight -= 0.10; // Few low scores when generally rating high
+          
+          if (metrics.distinctScoreValuesUsed.size === 1) weight -= 0.30; 
+          else if (metrics.distinctScoreValuesUsed.size === 2) weight -= 0.20;
+          
+          if (metrics.distinctScoreValuesUsed.size >= 3 && metrics.stdDevScoresGiven < 0.50 && metrics.scoresGivenValues.length >=10) weight -= 0.10; // Low variance despite using multiple scores
+          
+          if (metrics.avgIntraPeerSd < 0.25 && metrics.totalScoredAssessments >= 10) weight -= 0.15; // Very consistent scoring for individual peers
+          
+          if (metrics.avgAbsDevFromGroupMedian > 0.70 && numScoresGiven >= 10) weight -= 0.15; // Often deviates from group consensus
+          
+          if (metrics.percentScoresWithComment > 30) weight += 0.05;
+          if (metrics.percentScoresWithComment > 50) weight += 0.05; // Cumulative addition
+      }
+
+      weight = Math.max(0.0, Math.min(1.0, weight)); // Clamp weight between 0.0 and 1.0
+      
+      // Ensure a minimum weight if any scores were given, unless explicitly 0.0
+      if (numScoresGiven > 0 && weight < 0.4 && weight !== 0.0) {
+          weight = 0.4; 
+      }
+
+      metrics.calculatedWeight = parseFloat(weight.toFixed(3)); 
+      evaluatorWeights[evaluatorId] = metrics.calculatedWeight; 
     }
-
-    weight = Math.max(0.0, weight); 
-    if (numScoresGiven > 0 && weight < 0.4 && weight !== 0.0) weight = 0.4; 
-    weight = Math.min(1.0, weight); 
-
-    metrics.calculatedWeight = parseFloat(weight.toFixed(3)); 
-    evaluatorWeights[evaluatorId] = metrics.calculatedWeight; 
   }
   Logger.log("Analytics: Evaluator weights calculated.");
 
   // --- Prepare Data Rows for Output Sheet ---
   let outputDataRows = [];
   const evaluatorIdsFromMetrics = Object.keys(evaluatorMetrics);
-  Logger.log(`DEBUG SORT: About to sort ${evaluatorIdsFromMetrics.length} evaluator IDs. Sample IDs: ${evaluatorIdsFromMetrics.slice(0,5).join(', ')}`);
+  // Logger.log(`DEBUG SORT: About to sort ${evaluatorIdsFromMetrics.length} evaluator IDs. Sample IDs: ${evaluatorIdsFromMetrics.slice(0,5).join(', ')}`);
 
   const sortedEvaluatorIdsForReport = evaluatorIdsFromMetrics.sort((a, b) => {
       const metricA = evaluatorMetrics[a];
       const metricB = evaluatorMetrics[b];
-      let aName = "[SORT_DEBUG_ANAME_UNSET]"; 
-      let bName = "[SORT_DEBUG_BNAME_UNSET]"; 
-      if (metricA && metricA.studentName && typeof metricA.studentName === 'string') { aName = metricA.studentName; } 
-      else if (a && typeof a === 'string') { aName = a; Logger.log(`DEBUG SORT: Fallback to ID for a. Original a: '${a}', metricA studentName: ${metricA ? metricA.studentName : 'metricA undefined'}`);} 
-      else { aName = ""; Logger.log(`DEBUG SORT: Critical fallback to empty string for a. Original a: '${a}', metricA: ${metricA ? JSON.stringify(metricA) : 'metricA undefined'}`); }
-      if (metricB && metricB.studentName && typeof metricB.studentName === 'string') { bName = metricB.studentName; } 
-      else if (b && typeof b === 'string') { bName = b; Logger.log(`DEBUG SORT: Fallback to ID for b. Original b: '${b}', metricB studentName: ${metricB ? metricB.studentName : 'metricB undefined'}`);} 
-      else { bName = ""; Logger.log(`DEBUG SORT: Critical fallback to empty string for b. Original b: '${b}', metricB: ${metricB ? JSON.stringify(metricB) : 'metricB undefined'}`); }
-      if (typeof aName !== 'string' || typeof bName !== 'string') { Logger.log(`DEBUG SORT ERROR: Non-string! a: '${aName}', b: '${bName}'. Defaulting to ID sort.`); return (a || "").toString().localeCompare((b || "").toString()); }
+      // Fallback to ID sort if name is missing or not a string
+      const aName = (metricA && typeof metricA.studentName === 'string' && metricA.studentName) ? metricA.studentName : a; 
+      const bName = (metricB && typeof metricB.studentName === 'string' && metricB.studentName) ? metricB.studentName : b; 
       return aName.localeCompare(bName);
   });
 
@@ -247,19 +311,19 @@ function generateEvaluatorAnalyticsAndWeights() {
       evaluatorId, 
       metrics.studentName || `[Name for ${evaluatorId}]`,
       metrics.totalScoredAssessments || 0, 
-      (metrics.avgScoreGiven !== undefined && !isNaN(metrics.avgScoreGiven) && metrics.scoresGivenValues.length > 0) ? metrics.avgScoreGiven.toFixed(2) : "N/A",
-      (metrics.stdDevScoresGiven !== undefined && !isNaN(metrics.stdDevScoresGiven) && metrics.scoresGivenValues.length > 1) ? metrics.stdDevScoresGiven.toFixed(2) : "N/A",
+      (typeof metrics.avgScoreGiven === 'number' && metrics.scoresGivenValues.length > 0) ? metrics.avgScoreGiven.toFixed(2) : "N/A",
+      (typeof metrics.stdDevScoresGiven === 'number' && metrics.scoresGivenValues.length > 1) ? metrics.stdDevScoresGiven.toFixed(2) : "N/A",
       metrics.distinctScoreValuesUsed ? metrics.distinctScoreValuesUsed.size : 0,
-      (metrics.rangeScoresUsed !== undefined && metrics.scoresGivenValues.length > 0) ? metrics.rangeScoresUsed : "N/A",
-      (metrics.percentMaxScore !== undefined && !isNaN(metrics.percentMaxScore) && metrics.scoresGivenValues.length > 0) ? metrics.percentMaxScore.toFixed(1) + "%" : "N/A",
-      (metrics.percentMinScore !== undefined && !isNaN(metrics.percentMinScore) && metrics.scoresGivenValues.length > 0) ? metrics.percentMinScore.toFixed(1) + "%" : "N/A",
-      (metrics.percentMidScores !== undefined && !isNaN(metrics.percentMidScores) && metrics.scoresGivenValues.length > 0) ? metrics.percentMidScores.toFixed(1) + "%" : "N/A",
-      (metrics.avgIntraPeerSd !== undefined && !isNaN(metrics.avgIntraPeerSd)) ? metrics.avgIntraPeerSd.toFixed(2) : "N/A", // Allow 0 for this
-      (metrics.avgAbsDevFromGroupMedian !== undefined && !isNaN(metrics.avgAbsDevFromGroupMedian)) ? metrics.avgAbsDevFromGroupMedian.toFixed(2) : "N/A", // Allow 0
+      (typeof metrics.rangeScoresUsed === 'number' && metrics.scoresGivenValues.length > 0) ? metrics.rangeScoresUsed : "N/A",
+      (typeof metrics.percentMaxScore === 'number' && metrics.scoresGivenValues.length > 0) ? metrics.percentMaxScore.toFixed(1) + "%" : "N/A",
+      (typeof metrics.percentMinScore === 'number' && metrics.scoresGivenValues.length > 0) ? metrics.percentMinScore.toFixed(1) + "%" : "N/A",
+      (typeof metrics.percentMidScores === 'number' && metrics.scoresGivenValues.length > 0) ? metrics.percentMidScores.toFixed(1) + "%" : "N/A",
+      (typeof metrics.avgIntraPeerSd === 'number') ? metrics.avgIntraPeerSd.toFixed(2) : "N/A", // Allows 0
+      (typeof metrics.avgAbsDevFromGroupMedian === 'number') ? metrics.avgAbsDevFromGroupMedian.toFixed(2) : "N/A", // Allows 0
       metrics.commentsMadeCount || 0, 
-      (metrics.percentScoresWithComment !== undefined && !isNaN(metrics.percentScoresWithComment)) ? metrics.percentScoresWithComment.toFixed(1) + "%" : "N/A",
-      (metrics.avgCommentLength !== undefined && !isNaN(metrics.avgCommentLength) && metrics.commentLengths && metrics.commentLengths.length > 0) ? metrics.avgCommentLength.toFixed(1) : "N/A",
-      metrics.calculatedWeight !== undefined ? metrics.calculatedWeight.toFixed(3) : "N/A"
+      (typeof metrics.percentScoresWithComment === 'number') ? metrics.percentScoresWithComment.toFixed(1) + "%" : "N/A",
+      (typeof metrics.avgCommentLength === 'number' && metrics.commentLengths && metrics.commentLengths.length > 0) ? metrics.avgCommentLength.toFixed(1) : "N/A",
+      typeof metrics.calculatedWeight === 'number' ? metrics.calculatedWeight.toFixed(3) : "N/A"
     ]);
   }
   Logger.log(`Prepared ${outputDataRows.length} rows for the analytics report.`);
@@ -280,7 +344,12 @@ function generateEvaluatorAnalyticsAndWeights() {
     numericalHeaders.forEach(header => {
         const colIdx = analyticsHeaders.indexOf(header);
         if (colIdx !== -1) {
-            reportSheet.getRange(2, colIdx + 1, outputDataRows.length, 1).setHorizontalAlignment("right");
+            // Get current values to avoid overwriting "" with 0 for formatting if cell is "N/A"
+            const columnData = reportSheet.getRange(2, colIdx + 1, outputDataRows.length, 1).getValues();
+            const formats = columnData.map(row => [row[0] === "N/A" ? "@" : "0.00"]); // Or "0.0%" for percentages, etc.
+            reportSheet.getRange(2, colIdx + 1, outputDataRows.length, 1)
+                       .setHorizontalAlignment("right")
+                       .setNumberFormats(formats); // Apply formats row by row
         }
     });
     reportSheet.autoResizeColumns(1, analyticsHeaders.length);

@@ -1,23 +1,53 @@
-// In Workflow_Scoring.gs
+/* global PA_FINAL_SCORES_SUMMARY_SHEET_NAME, parseRawSurveyData, generateEvaluatorAnalyticsAndWeights, calculateMean, calculateMedianFromArray */
 
 /**
- * Calculates weighted peer scores and updates the target summary sheet ("PaFinalScoresSummary").
- * - Uses the NEW V2 parser (parseRawSurveyData from Parser_V2.gs).
- * - Creates/clears the target sheet and populates with camelCase headers.
- * - Populates student list from the master list of active students.
- * - Clears old scores from the target sheet.
- * - Calculates weighted scores for each question and an overall weighted median for each student.
- * - Writes results to the target summary sheet.
+ * @file Workflow_Scoring.js
+ * @description This file is responsible for calculating the final weighted peer assessment scores
+ * for each student and for each question, as well as an overall weighted median score per student.
+ * It utilizes parsed submission data and evaluator weights. The results are outputted to the
+ * 'PaFinalScoresSummary' Google Sheet. This function is typically invoked from the
+ * custom menu in Google Sheets.
+ *
+ * @requires Config.gs (for PA_FINAL_SCORES_SUMMARY_SHEET_NAME)
+ * @requires Parser_V2.js (for parseRawSurveyData function)
+ * @requires Workflow_Analytics.js (for generateEvaluatorAnalyticsAndWeights function)
+ * @requires Utils.js (for calculateMean, calculateMedianFromArray functions)
  */
+
+// In Workflow_Scoring.gs // Your existing comment
+
+/**
+ * Calculates weighted peer assessment scores for each student and updates the
+ * 'PaFinalScoresSummary' sheet.
+ *
+ * The process involves:
+ * 1. Parsing raw submission data using {@link parseRawSurveyData}.
+ * 2. Generating/retrieving evaluator weights using {@link generateEvaluatorAnalyticsAndWeights}.
+ * 3. Preparing the target summary sheet ('PaFinalScoresSummary') by clearing it and setting up headers.
+ * 4. Populating the sheet with a list of active students from the master list.
+ * 5. For each student and each assessment question:
+ *    a. Aggregating all scores received for that student on that question.
+ *    b. Applying the respective evaluator's weight to each score.
+ *    c. Calculating a weighted average score for the question.
+ *    d. If no weighted scores are available but unweighted scores exist, a simple mean is used as a fallback.
+ * 6. Calculating an overall weighted median score for each student across all their question scores.
+ * 7. Writing these calculated scores and medians to the 'PaFinalScoresSummary' sheet.
+ *
+ * This function is typically called from a custom menu item.
+ *
+ * @function calculateWeightedScoresAndUpdateSheet
+ * @returns {void} This function does not return a value but updates a Google Sheet.
+ */
+// eslint-disable-next-line no-unused-vars
 function calculateWeightedScoresAndUpdateSheet() {
-  var ui = SpreadsheetApp.getUi();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi(); // GAS services from eslint.config.mjs
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   Logger.clear();
   Logger.log("--- calculateWeightedScoresAndUpdateSheet: Starting (Using V2 Parser, camelCase Headers) ---");
 
   const targetSheetName = PA_FINAL_SCORES_SUMMARY_SHEET_NAME; 
 
-  const parsedData = parseRawSurveyData(); // From Parser_V2.gs
+  const parsedData = parseRawSurveyData(); 
   if (!parsedData || !parsedData.students || !parsedData.responses || !parsedData.questions) {
     ui.alert("Data Parsing Error", "Could not parse data using V2 parser. Cannot calculate scores.", ui.ButtonSet.OK);
     Logger.log("ERROR: V2 Parsed data is invalid or incomplete (students, questions, or responses missing).");
@@ -31,20 +61,18 @@ function calculateWeightedScoresAndUpdateSheet() {
   }
   Logger.log(`V2 Parsed data: ${Object.keys(allStudentsFromMaster).length} active students, ${Object.keys(questions).length} questions, ${responses.length} responses.`);
 
-  const evaluatorWeights = generateEvaluatorAnalyticsAndWeights(); // From Workflow_Analytics.gs
+  const evaluatorWeights = generateEvaluatorAnalyticsAndWeights(); 
   if (!evaluatorWeights) { 
-    // This means generateEvaluatorAnalyticsAndWeights itself had a critical error and returned null
     ui.alert("Weighting Error", "Critical error: Could not retrieve evaluator weights (function returned null). Scores cannot be calculated.", ui.ButtonSet.OK);
     Logger.log("CRITICAL ERROR: Evaluator weights function (generateEvaluatorAnalyticsAndWeights) returned null. Aborting score calculation.");
     return; 
   } else if (Object.keys(evaluatorWeights).length === 0) {
     Logger.log("Warning: Evaluator weights object is empty. All scores will effectively be unweighted or based on fallback logic if no evaluators had sufficient data for weighting.");
-    // ui.alert("Weighting Info", "Evaluator weights object is empty. Scores will be unweighted or use fallback logic.", ui.ButtonSet.OK); // Optional: can be noisy
   } else {
     Logger.log(`Retrieved ${Object.keys(evaluatorWeights).length} evaluator weights.`);
   }
 
-  var targetSheet = ss.getSheetByName(targetSheetName);
+  let targetSheet = ss.getSheetByName(targetSheetName); // Changed: var to let
   if (targetSheet) {
     Logger.log(`Sheet "${targetSheetName}" found. Clearing contents and formats.`);
     targetSheet.clearContents().clearFormats(); 
@@ -57,10 +85,9 @@ function calculateWeightedScoresAndUpdateSheet() {
   const studentNameHeader = "studentName";
   const overallMedianHeader = "overallWeightedMedian";
   
-  var expectedHeadersInOrder = [studentIdHeader, studentNameHeader];
-  // Sort question IDs to ensure consistent column order
+  const expectedHeadersInOrder = [studentIdHeader, studentNameHeader]; // Changed: var to const
   const sortedQuestionIds = Object.keys(questions).sort(); 
-  sortedQuestionIds.forEach(qId => expectedHeadersInOrder.push(qId.toLowerCase())); // q01, q02 etc.
+  sortedQuestionIds.forEach(qId => expectedHeadersInOrder.push(qId.toLowerCase())); 
   expectedHeadersInOrder.push(overallMedianHeader);
 
   Logger.log(`Populating canonical camelCase headers in "${targetSheetName}". Headers: ${expectedHeadersInOrder.join(', ')}`);
@@ -68,25 +95,22 @@ function calculateWeightedScoresAndUpdateSheet() {
   targetSheet.getRange(1, 1, 1, expectedHeadersInOrder.length).setFontWeight("bold").setHorizontalAlignment("center");
   targetSheet.setFrozenRows(1);
     
-  // Create a map for 0-based header indices for array access
   const headerMap = {};
   expectedHeadersInOrder.forEach((header, index) => { headerMap[header] = index; });
   const studentIdColTargetIdx = headerMap[studentIdHeader]; 
   const studentNameColTargetIdx = headerMap[studentNameHeader]; 
   
-  // Create a map for 1-based column numbers for sheet.getRange() access for questions
-  var questionColMapTarget = {}; // Stores QID (UPPERCASE) -> column number (1-based)
-  var overallMedianColNum = -1;  // 1-based column number
+  const questionColMapTarget = {}; // Changed: var to const
+  let overallMedianColNum = -1;  // Changed: var to let
 
   expectedHeadersInOrder.forEach((header, index) => {
-      if (header.match(/^q\d{1,2}$/)) { // Matches q1, q01, q10 etc.
+      if (header.match(/^q\d{1,2}$/)) { 
           questionColMapTarget[header.toUpperCase()] = index + 1; 
       } else if (header === overallMedianHeader) {
           overallMedianColNum = index + 1;
       }
   });
 
-  // Validate header mapping
   if (Object.keys(questionColMapTarget).length !== sortedQuestionIds.length) {
       Logger.log(`CRITICAL ERROR: Question column mapping failed for target sheet "${targetSheetName}". Expected ${sortedQuestionIds.length} question columns, mapped ${Object.keys(questionColMapTarget).length}.`);
       ui.alert("Internal Error", "Failed to map question columns in target sheet. Check logs.", ui.ButtonSet.OK);
@@ -98,26 +122,22 @@ function calculateWeightedScoresAndUpdateSheet() {
      return;
   }
 
-
-  // --- Populate Student List in Target Sheet using allStudentsFromMaster ---
-  var studentsToAddRows = []; 
-  // Sort student IDs by student name for consistent order in the sheet
+  const studentsToAddRows = []; // Changed: var to const
   const studentIdsFromMasterSorted = Object.keys(allStudentsFromMaster).sort((a,b) => {
     const studentA = allStudentsFromMaster[a];
     const studentB = allStudentsFromMaster[b];
     if (studentA && studentA.studentName && studentB && studentB.studentName) {
         return studentA.studentName.localeCompare(studentB.studentName);
     }
-    return a.localeCompare(b); // Fallback to ID sort if names are missing/problematic
+    return a.localeCompare(b); 
   });
 
   for (const studentId of studentIdsFromMasterSorted) { 
       const studentDetails = allStudentsFromMaster[studentId];
-      // Ensure studentDetails is valid and has studentId and studentName (even if placeholder)
       if (studentDetails && studentDetails.studentId) { 
-          let studentRowValues = new Array(expectedHeadersInOrder.length).fill(""); // Initialize with empty strings
+          let studentRowValues = new Array(expectedHeadersInOrder.length).fill(""); 
           studentRowValues[studentIdColTargetIdx] = studentDetails.studentId; 
-          if (studentNameColTargetIdx !== undefined) { // Check if studentNameHeader was actually found
+          if (studentNameColTargetIdx !== undefined) { 
              studentRowValues[studentNameColTargetIdx] = studentDetails.studentName || `[Name missing for ${studentDetails.studentId}]`; 
           }
           studentsToAddRows.push(studentRowValues);
@@ -128,20 +148,14 @@ function calculateWeightedScoresAndUpdateSheet() {
       Logger.log(`Populated ${studentsToAddRows.length} active students into "${targetSheetName}".`);
   } else {
       Logger.log(`No active students from master list to populate into "${targetSheetName}".`);
-      // ui.alert("Info", `No students to populate into ${targetSheetName}.`, ui.ButtonSet.OK); // Can be noisy
-      // No need to proceed if no students in the sheet.
       return;
   }
   
-  // Get the data from the sheet again, now that it's populated with students
-  var finalTargetSheetData = targetSheet.getDataRange().getValues(); 
+  const finalTargetSheetData = targetSheet.getDataRange().getValues(); // Changed: var to const
   
-  // --- Calculate Weighted Scores and Prepare Updates ---
-  var updatesForSheet = []; // Array of objects: { row: 1-based, col: 1-based, value: ... }
+  const updatesForSheet = []; // Changed: var to const
   
-  // Iterate through students as they appear in the target sheet (finalTargetSheetData)
-  // Start r from 1 to skip header row in finalTargetSheetData (which is 0-indexed array)
-  for (let r = 1; r < finalTargetSheetData.length; r++) { // r is 0-indexed for finalTargetSheetData, corresponds to sheet row r+1
+  for (let r = 1; r < finalTargetSheetData.length; r++) { 
     const evaluatedStudentId = finalTargetSheetData[r][studentIdColTargetIdx] ? finalTargetSheetData[r][studentIdColTargetIdx].toString().trim() : null;
     
     if (!evaluatedStudentId || !allStudentsFromMaster[evaluatedStudentId]) { 
@@ -149,11 +163,10 @@ function calculateWeightedScoresAndUpdateSheet() {
         continue;
     }
 
-    let studentQuestionScoresForMedian = []; // Stores the final calculated score for each question for this student
+    let studentQuestionScoresForMedian = []; 
     
-    // Iterate through the sorted question IDs (e.g., "Q01", "Q02")
-    for (const questionId of sortedQuestionIds) { // questionId is UPPERCASE here
-      const targetSheetQuestionColNum = questionColMapTarget[questionId]; // Get 1-based column number
+    for (const questionId of sortedQuestionIds) { 
+      const targetSheetQuestionColNum = questionColMapTarget[questionId]; 
       
       if (!targetSheetQuestionColNum) {
         Logger.log(`Warning: Column for question ${questionId} (header: ${questionId.toLowerCase()}) not found in target sheet map for student ${evaluatedStudentId}. Skipping this question for this student.`);
@@ -162,20 +175,19 @@ function calculateWeightedScoresAndUpdateSheet() {
       
       let weightedScoreSum = 0;
       let totalWeightSum = 0;
-      let scoresForThisItemCount = 0; // Count of evaluations with weight > 0
-      let unweightedScores = [];     // All scores for this item, regardless of weight
+      let scoresForThisItemCount = 0; 
+      let unweightedScores = [];     
 
       responses.forEach(resp => {
         if (resp.evaluatedStudentId === evaluatedStudentId &&
-            resp.responseToQuestionId === questionId && // questionId is already uppercase
+            resp.responseToQuestionId === questionId && 
             resp.responseType === "SCORE" && typeof resp.responseValue === 'number' && !isNaN(resp.responseValue)) {
           
           unweightedScores.push(resp.responseValue);
           const evaluatorId = resp.responseByStudentId;
           
-          // Get weight. Default to 0 if evaluatorId is null, or not in weights map, or weight is not a number.
           let evaluatorWeight = 0;
-          if (evaluatorId && evaluatorWeights && evaluatorWeights.hasOwnProperty(evaluatorId)) {
+          if (evaluatorId && evaluatorWeights && Object.prototype.hasOwnProperty.call(evaluatorWeights, evaluatorId)) { // Check own property
               const w = evaluatorWeights[evaluatorId];
               if (typeof w === 'number' && !isNaN(w)) {
                   evaluatorWeight = w;
@@ -184,7 +196,7 @@ function calculateWeightedScoresAndUpdateSheet() {
               }
           }
           
-          if (evaluatorWeight > 0) { // Only include if weight > 0
+          if (evaluatorWeight > 0) { 
             weightedScoreSum += resp.responseValue * evaluatorWeight;
             totalWeightSum += evaluatorWeight;
             scoresForThisItemCount++;
@@ -192,35 +204,30 @@ function calculateWeightedScoresAndUpdateSheet() {
         }
       });
 
-      let finalScoreForQuestion = ""; // Default to blank
+      let finalScoreForQuestion = ""; 
       if (scoresForThisItemCount > 0 && totalWeightSum > 0) {
         finalScoreForQuestion = weightedScoreSum / totalWeightSum;
       } else if (unweightedScores.length > 0) { 
-        // Fallback: If no scores with weight > 0, but there are unweighted scores, use the mean of unweighted.
         Logger.log(`Info: Zero total weight for ${evaluatedStudentId} on ${questionId}. Using MEAN of ${unweightedScores.length} unweighted scores as fallback.`);
         finalScoreForQuestion = calculateMean(unweightedScores); 
-      } else {
-        // No scores at all for this item. finalScoreForQuestion remains ""
-        // Logger.log(`Info: No scores (weighted or unweighted) found for ${evaluatedStudentId} on ${questionId}. Cell will be blank.`);
       }
       
       if (typeof finalScoreForQuestion === 'number' && !isNaN(finalScoreForQuestion)) {
-        studentQuestionScoresForMedian.push(finalScoreForQuestion); // Add to list for overall median calc
+        studentQuestionScoresForMedian.push(finalScoreForQuestion); 
         updatesForSheet.push({ 
-            row: r + 1, // 1-based sheet row
+            row: r + 1, 
             col: targetSheetQuestionColNum, 
             value: parseFloat(finalScoreForQuestion.toFixed(2))
         });
       } else {
-         updatesForSheet.push({ // Ensure cell is blanked if no score
+         updatesForSheet.push({ 
             row: r + 1, 
             col: targetSheetQuestionColNum, 
             value: ""
         });
       }
-    } // End loop through questions
+    } 
 
-    // Calculate overall median for the student if they have any question scores
     if (studentQuestionScoresForMedian.length > 0 && overallMedianColNum > 0) {
         let overallMedianValue = calculateMedianFromArray(studentQuestionScoresForMedian); 
         if (typeof overallMedianValue === 'number' && !isNaN(overallMedianValue)) {
@@ -229,31 +236,28 @@ function calculateWeightedScoresAndUpdateSheet() {
                 col: overallMedianColNum,
                 value: parseFloat(overallMedianValue.toFixed(2))
             });
-        } else { // Median calculation resulted in NaN or non-number
+        } else { 
             updatesForSheet.push({ row: r + 1, col: overallMedianColNum, value: "" });
         }
-    } else if (overallMedianColNum > 0) { // No question scores, ensure median cell is blank
+    } else if (overallMedianColNum > 0) { 
         updatesForSheet.push({
             row: r + 1, 
             col: overallMedianColNum,
             value: ""
         });
     }
-  } // End loop through students in target sheet
+  } 
   Logger.log("WEIGHTED scores and overall medians calculated for batch update. Total updates to apply: " + updatesForSheet.length);
 
-  // --- Apply Updates to the Sheet ---
   if (updatesForSheet.length > 0) {
-    // Batching updates can be faster for very large datasets, but individual updates are simpler here.
-    // For very large sheets, consider SpreadsheetApp.RangeList#setValues() if performance is an issue.
     updatesForSheet.forEach(update => { 
-        if (update.row > 0 && update.col > 0) { // Basic sanity check for row/col
+        if (update.row > 0 && update.col > 0) { 
             targetSheet.getRange(update.row, update.col)
                        .setValue(update.value)
                        .setNumberFormat((update.value === "" || typeof update.value !== 'number' || isNaN(update.value)) ? "@" : "0.00");
         }
     });
-    try { // Auto-resize can sometimes fail on very complex sheets or if hidden columns exist
+    try { 
         targetSheet.autoResizeColumns(1, expectedHeadersInOrder.length);
     } catch (e) {
         Logger.log(`Warning: autoResizeColumns failed. Error: ${e.message}`);
@@ -262,7 +266,6 @@ function calculateWeightedScoresAndUpdateSheet() {
     ui.alert("Weighted Scores Updated", `WEIGHTED scores and overall medians updated in "${targetSheetName}".`, ui.ButtonSet.OK);
   } else {
     Logger.log("No WEIGHTED scores or medians to update in target sheet (updatesForSheet array was empty).");
-    // ui.alert("No Updates", "No scores or medians were calculated or updated in the target sheet.", ui.ButtonSet.OK); // Can be noisy
   }
   ss.setActiveSheet(targetSheet); 
   Logger.log(`--- calculateWeightedScoresAndUpdateSheet: Complete (Using V2 Parser for ${targetSheetName}) ---`);
