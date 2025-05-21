@@ -1,0 +1,9 @@
+const PA_QUESTION_CONFIG_SHEET_NAME = "PaQuestionConfig";
+const PA_MASTER_STUDENT_LIST_SHEET_NAME = "PaMasterStudentList";
+const PA_RAW_SUBMISSIONS_V2_SHEET_NAME = "PaRawSubmissionsV2"; // For new data (future)
+const PA_RAW_SUBMISSIONS_V1_SHEET_NAME = "PaRawSubmissionsV1"; // For current testing
+const PA_EVALUATOR_ANALYTICS_SHEET_NAME = "PaEvaluatorAnalytics";
+const PA_FINAL_SCORES_SUMMARY_SHEET_NAME = "PaFinalScoresSummary";
+const PA_REPORT_ALL_RESPONSES_SHEET_NAME = "PaReportAllResponses";
+const PA_REPORT_MISSING_ASSESSMENTS_SHEET_NAME = "PaReportMissingAssessments";
+const PA_VERIFICATION_MISSING_ASSESSMENTS_SHEET_NAME = "PaVerificationMissingAssessments";
