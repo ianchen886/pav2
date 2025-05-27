@@ -1,28 +1,17 @@
 {
-  "name": "peerassessmentv2",
+  "name": "peer-assessment-v2",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "Peer Assessment System V2",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "status": "clasp status",
+    "pull": "clasp pull",
+    "push": "clasp push",
+    "deploy": "clasp deploy",
+    "logs": "clasp logs",
+    "open": "open 'https://script.google.com/d/1vu9fmueK0Y0u_eBZZBI6N_qJnvvLcXXz_5vGNp6SrAYQKY5MUruC8bJH/edit'"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ianchen886/pav2.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/ianchen886/pav2/issues"
-  },
-  "homepage": "https://github.com/ianchen886/pav2#readme",
-  "description": "",
   "devDependencies": {
-    "@eslint/css": "^0.8.1",
-    "@eslint/js": "^9.27.0",
-    "@eslint/json": "^0.12.0",
-    "@eslint/markdown": "^6.4.0",
-    "eslint": "^9.27.0",
-    "globals": "^16.1.0"
+    "@google/clasp": "2.4.2"
   }
 }

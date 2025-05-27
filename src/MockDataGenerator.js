@@ -1,5 +1,3 @@
-// Place this entire function in a .gs file (e.g., MockDataGenerator.gs or Utils.gs)
-
 /**
  * Populates the 'PaRawSubmissionsV2' sheet with mock peer assessment data.
  * Reads student list from 'PaMasterStudentList' and questions from 'PaQuestionConfig'.

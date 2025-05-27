@@ -1,5 +1,3 @@
-// In MainMenu.gs
-
 /**
  * @OnlyCurrentDoc
  * This special function runs when the spreadsheet is opened.

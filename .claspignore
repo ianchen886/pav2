@@ -1,13 +1,10 @@
-# Git
-.git/
+node_modules/**
+**/node_modules/**
+package*.json
+eslint.config.mjs
+.git/**
 .gitignore
-
-# Node modules
-node_modules/
-
-# OS generated files
 .DS_Store
-Thumbs.db
-
-# Backups / Temp
+**/.DS_Store
+*.md
 *.bak
