@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peer Assessment Portal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .role-indicator {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2em;
+            color: #666;
+        }
+
+        .student-selector {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 5px solid #667eea;
+        }
+
+        .student-selector h2 {
+          margin-bottom: 15px;
+          color: #333;
+          font-size: 1.4em;
+        }
+
+        .faculty-notice {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .unit-filter {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .unit-filter label {
+            font-weight: 500;
+            color: #555;
+        }
+
+        .unit-filter select {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        .dropdown-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .dropdown-label {
+            font-weight: 500;
+            color: #555;
+            min-width: 120px;
+        }
+
+        .student-dropdown {
+            flex: 1;
+            min-width: 250px;
+            padding: 12px 16px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+
+        .student-dropdown:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .student-dropdown:disabled {
+            background: #f5f5f5;
+            cursor: not-allowed;
+            color: #999;
+        }
+
+        .select-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .select-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .select-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .peer-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 5px solid #667eea;
+            display: none;
+        }
+
+        .peer-card.active {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .peer-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .peer-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-right: 15px;
+        }
+
+        .unit-badge {
+            background: #28a745;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+
+        .back-to-selection {
+            background: #6c757d;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            margin-bottom: 15px;
+        }
+
+        .back-to-selection:hover {
+            background: #5a6268;
+        }
+        
+        .question-block {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .rating-scale {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+        
+        .rating-option input[type="radio"] {
+            opacity: 0;
+            position: absolute;
+        }
+        
+        .rating-label {
+            display: block;
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+            min-width: 40px;
+            text-align: center;
+            font-weight: 500;
+        }
+        
+        .rating-option input[type="radio"]:checked + .rating-label {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+            transform: scale(1.05);
+        }
+        
+        .comment-textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.95em;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+            margin-top: 10px;
+        }
+        
+        .comment-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            display: block;
+            margin: 40px auto;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .progress-indicator {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+            display: none;
+        }
+
+        .progress-indicator.show {
+            display: block;
+        }
+        
+        .progress-bar {
+            height: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .error, .success {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            display: none;
+        }
+        
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .completed-assessments {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 5px solid #28a745;
+        }
+
+        .completed-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .completed-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .completed-list li:last-child {
+            border-bottom: none;
+        }
+
+        .edit-btn {
+            background: #ffc107;
+            color: #212529;
+            padding: 4px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .edit-btn:hover {
+            background: #e0a800;
+        }
+
+        @media (max-width: 768px) {
+            .dropdown-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .dropdown-label {
+                min-width: auto;
+            }
+
+            .student-dropdown {
+                min-width: auto;
+            }
+
+            .unit-filter {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Peer Assessment Portal</h1>
+            <div id="userInfo">
+                <strong id="userName">Loading...</strong>
+                <span id="roleIndicator" class="role-indicator"></span>
+                <br>
+                <span id="userDetails">Loading user information...</span>
+            </div>
+        </div>
+        
+        <div id="loadingIndicator" class="loading">
+            <p>🔄 Loading your assessment form...</p>
+        </div>
+        
+        <div id="errorContainer" class="error"></div>
+        <div id="successContainer" class="success"></div>
+        
+        <div id="progressContainer" class="progress-indicator">
+            <p>Assessment Progress</p>
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill"></div>
+            </div>
+            <p><span id="progressText">0% Complete</span></p>
+        </div>
+
+        <!-- Completed Assessments Summary -->
+        <div id="completedContainer" class="completed-assessments" style="display: none;">
+            <h3>📝 Completed Assessments</h3>
+            <ul id="completedList" class="completed-list"></ul>
+        </div>
+        
+        <!-- Student Selection Interface -->
+        <div id="studentSelector" class="student-selector" style="display: none;">
+            <h2>Select Student to Evaluate</h2>
+            
+            <!-- Faculty Notice -->
+            <div id="facultyNotice" class="faculty-notice" style="display: none;">
+                <strong>👨‍🏫 Faculty Mode:</strong> You can evaluate any student in the system
+            </div>
+            
+            <!-- Unit Filter for Faculty -->
+            <div id="unitFilter" class="unit-filter" style="display: none;">
+                <label for="unitFilterSelect">Filter by Unit:</label>
+                <select id="unitFilterSelect">
+                    <option value="">All Units</option>
+                    <option value="A">Unit A</option>
+                    <option value="B">Unit B</option>
+                    <option value="C">Unit C</option>
+                    <option value="D">Unit D</option>
+                    <option value="UNASSIGNED">Unassigned</option>
+                </select>
+            </div>
+            
+            <div class="dropdown-container">
+                <label class="dropdown-label" for="studentDropdown">Choose Student:</label>
+                <select id="studentDropdown" class="student-dropdown">
+                    <option value="">-- Select a student to evaluate --</option>
+                </select>
+                <button id="selectStudentBtn" class="select-btn" disabled>Start Assessment</button>
+            </div>
+        </div>
+        
+        <div id="assessmentContainer" style="display: none;">
+            <!-- Assessment form will be loaded here -->
+            <button class="back-to-selection" onclick="showStudentSelector()">
+                ← Back to Student Selection
+            </button>
+        </div>
+        
+        <div id="submitContainer" style="display: none;">
+            <button id="submitBtn" class="submit-btn" onclick="submitCurrentAssessment()" disabled>
+                📝 Submit Assessment
+            </button>
+            <button id="submitAllBtn" class="submit-btn" onclick="submitAllAssessments()" style="display: none;">
+                🎯 Submit All Assessments
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let userSession = null;
+        let questionDefinitions = {};
+        let assessmentData = {};
+        let completedAssessments = new Set();
+        let currentlyEvaluating = null;
+        let allStudents = []; // Store all students for filtering
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeAssessment();
+        });
+        
+        async function initializeAssessment() {
+            try {
+                showLoading(true);
+                
+                // Get user session
+                userSession = await getUserSession();
+                if (!userSession || !userSession.isAuthenticated) {
+                    throw new Error('Authentication failed. Please refresh and try again.');
+                }
+                
+                updateUserDisplay();
+                
+                // Load questions
+                questionDefinitions = await getQuestionDefinitions();
+                
+                // Initialize assessment data structure
+                initializeAssessmentData();
+                
+                // Show student selector
+                showStudentSelector();
+                
+                showLoading(false);
+                updateProgress();
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                showError('Failed to load assessment form: ' + error.message);
+                showLoading(false);
+            }
+        }
+        
+        function initializeAssessmentData() {
+            if (!userSession.unitMembers || userSession.unitMembers.length === 0) {
+                return;
+            }
+            
+            // Initialize data structure for all available students
+            userSession.unitMembers.forEach(member => {
+                assessmentData[member.studentId] = {};
+            });
+        }
+        
+        function showStudentSelector() {
+            // Hide other containers
+            document.getElementById('assessmentContainer').style.display = 'none';
+            document.getElementById('submitContainer').style.display = 'none';
+            document.getElementById('progressContainer').classList.remove('show');
+            
+            // Show student selector
+            const selector = document.getElementById('studentSelector');
+            const dropdown = document.getElementById('studentDropdown');
+            const selectBtn = document.getElementById('selectStudentBtn');
+            
+            // Show faculty notice if user is faculty
+            const facultyNotice = document.getElementById('facultyNotice');
+            const unitFilter = document.getElementById('unitFilter');
+            
+            if (userSession.role === 'instructor' || userSession.isFaculty) {
+                facultyNotice.style.display = 'block';
+                unitFilter.style.display = 'flex';
+                setupUnitFilter();
+            } else {
+                facultyNotice.style.display = 'none';
+                unitFilter.style.display = 'none';
+            }
+            
+            if (!userSession.unitMembers || userSession.unitMembers.length === 0) {
+                selector.innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <h3>No Students Available</h3>
+                        <p>No students were found for assessment.</p>
+                        <p>Please contact your administrator if this seems incorrect.</p>
+                    </div>
+                `;
+                selector.style.display = 'block';
+                return;
+            }
+            
+            // Store all students for filtering
+            allStudents = [...userSession.unitMembers];
+            
+            // Populate dropdown
+            populateStudentDropdown(allStudents);
+            
+            // Event listeners
+            dropdown.addEventListener('change', function() {
+                const isSelected = this.value !== '';
+                selectBtn.disabled = !isSelected;
+                selectBtn.textContent = isSelected ? 'Start Assessment' : 'Start Assessment';
+            });
+            
+            selectBtn.addEventListener('click', function() {
+                const selectedStudentId = dropdown.value;
+                if (selectedStudentId) {
+                    showAssessmentForm(selectedStudentId);
+                }
+            });
+            
+            selector.style.display = 'block';
+            updateCompletedAssessments();
+        }
+        
+        function setupUnitFilter() {
+            const unitFilterSelect = document.getElementById('unitFilterSelect');
+            
+            unitFilterSelect.addEventListener('change', function() {
+                const selectedUnit = this.value;
+                let filteredStudents;
+                
+                if (selectedUnit === '') {
+                    // Show all students
+                    filteredStudents = allStudents;
+                } else {
+                    // Filter by selected unit
+                    filteredStudents = allStudents.filter(student => 
+                        student.productionUnit === selectedUnit
+                    );
+                }
+                
+                populateStudentDropdown(filteredStudents);
+            });
+        }
+        
+        function populateStudentDropdown(students) {
+            const dropdown = document.getElementById('studentDropdown');
+            
+            // Clear and populate dropdown
+            dropdown.innerHTML = '<option value="">-- Select a student to evaluate --</option>';
+            
+            if (students.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No students available';
+                option.disabled = true;
+                dropdown.appendChild(option);
+                return;
+            }
+            
+            // Group students by unit for better organization (for faculty)
+            const studentsByUnit = {};
+            students.forEach(student => {
+                const unit = student.productionUnit || 'UNASSIGNED';
+                if (!studentsByUnit[unit]) {
+                    studentsByUnit[unit] = [];
+                }
+                studentsByUnit[unit].push(student);
+            });
+            
+            // Add students to dropdown, grouped by unit if faculty
+            if (userSession.role === 'instructor' || userSession.isFaculty) {
+                Object.keys(studentsByUnit).sort().forEach(unit => {
+                    if (Object.keys(studentsByUnit).length > 1) {
+                        // Add unit header
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = unit === 'UNASSIGNED' ? 'Unassigned Students' : `Unit ${unit}`;
+                        dropdown.appendChild(optgroup);
+                    }
+                    
+                    studentsByUnit[unit].sort((a, b) => a.studentName.localeCompare(b.studentName)).forEach(student => {
+                        const option = document.createElement('option');
+                        option.value = student.studentId;
+                        option.textContent = `${student.studentName} (${student.studentId})`;
+                        
+                        // Mark as completed if already assessed
+                        if (completedAssessments.has(student.studentId)) {
+                            option.textContent += ' ✓';
+                            option.style.color = '#28a745';
+                        }
+                        
+                        if (Object.keys(studentsByUnit).length > 1) {
+                            optgroup.appendChild(option);
+                        } else {
+                            dropdown.appendChild(option);
+                        }
+                    });
+                });
+            } else {
+                // Simple list for regular students
+                students.forEach(student => {
+                    const option = document.createElement('option');
+                    option.value = student.studentId;
+                    option.textContent = `${student.studentName} (${student.studentId})`;
+                    
+                    // Mark as completed if already assessed
+                    if (completedAssessments.has(student.studentId)) {
+                        option.textContent += ' ✓';
+                        option.style.color = '#28a745';
+                    }
+                    
+                    dropdown.appendChild(option);
+                });
+            }
+        }
+        
+        function showAssessmentForm(studentId) {
+            const member = allStudents.find(m => m.studentId === studentId);
+            if (!member) {
+                showError('Selected student not found.');
+                return;
+            }
+            
+            currentlyEvaluating = studentId;
+            
+            // Hide selector
+            document.getElementById('studentSelector').style.display = 'none';
+            
+            // Show progress and assessment containers
+            document.getElementById('progressContainer').classList.add('show');
+            document.getElementById('assessmentContainer').style.display = 'block';
+            document.getElementById('submitContainer').style.display = 'block';
+            
+            // Build assessment form
+            buildAssessmentForm(member);
+            updateProgress();
+        }
+        
+        function buildAssessmentForm(member) {
+            const container = document.getElementById('assessmentContainer');
+            
+            // Create assessment card
+            const peerCard = createPeerAssessmentCard(member);
+            
+            // Clear container and add the back button + card
+            const backButton = container.querySelector('.back-to-selection');
+            container.innerHTML = '';
+            container.appendChild(backButton);
+            container.appendChild(peerCard);
+            
+            // Show the card
+            peerCard.classList.add('active');
+        }
+        
+        function createPeerAssessmentCard(member) {
+            const card = document.createElement('div');
+            card.className = 'peer-card';
+            card.id = `peer-${member.studentId}`;
+            
+            const initials = member.studentName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            
+            card.innerHTML = `
+                <div class="peer-header">
+                    <div class="peer-avatar">${initials}</div>
+                    <div class="peer-info">
+                        <h3>${member.studentName}</h3>
+                        <p>Student ID: ${member.studentId}</p>
+                        ${member.productionUnit ? `<span class="unit-badge">Unit ${member.productionUnit}</span>` : ''}
+                    </div>
+                </div>
+                <div class="questions-container">
+                    ${createQuestionsHTML(member.studentId)}
+                </div>
+            `;
+            
+            return card;
+        }
+        
+        function createQuestionsHTML(peerId) {
+            let html = '';
+            
+            Object.keys(questionDefinitions).forEach(questionId => {
+                const question = questionDefinitions[questionId];
+                html += `
+                    <div class="question-block">
+                        <div style="color: #667eea; font-weight: bold; font-size: 0.9em;">${questionId}</div>
+                        <div style="font-size: 1.1em; margin: 5px 0;">${question.questionPrompt}</div>
+                        ${question.questionInstruction ? `<div style="font-size: 0.9em; color: #666; font-style: italic;">${question.questionInstruction}</div>` : ''}
+                        
+                        <div class="rating-scale">
+                            ${[1,2,3,4,5].map(rating => `
+                                <div class="rating-option">
+                                    <input type="radio" 
+                                           id="rating-${peerId}-${questionId}-${rating}" 
+                                           name="rating-${peerId}-${questionId}" 
+                                           value="${rating}"
+                                           onchange="updateAssessmentData('${peerId}', '${questionId}', 'score', ${rating})"
+                                           ${getExistingScore(peerId, questionId) === rating ? 'checked' : ''}>
+                                    <label for="rating-${peerId}-${questionId}-${rating}" class="rating-label">${rating}</label>
+                                </div>
+                            `).join('')}
+                        </div>
+                        
+                        <textarea class="comment-textarea" 
+                                  placeholder="Optional comments about this assessment..."
+                                  onchange="updateAssessmentData('${peerId}', '${questionId}', 'comment', this.value)">${getExistingComment(peerId, questionId) || ''}</textarea>
+                    </div>
+                `;
+            });
+            
+            return html;
+        }
+        
+        function getExistingScore(peerId, questionId) {
+            return assessmentData[peerId] && assessmentData[peerId][questionId] 
+                ? assessmentData[peerId][questionId].score : null;
+        }
+        
+        function getExistingComment(peerId, questionId) {
+            return assessmentData[peerId] && assessmentData[peerId][questionId] 
+                ? assessmentData[peerId][questionId].comment : '';
+        }
+        
+        function updateAssessmentData(peerId, questionId, type, value) {
+            if (!assessmentData[peerId]) assessmentData[peerId] = {};
+            if (!assessmentData[peerId][questionId]) assessmentData[peerId][questionId] = {};
+            
+            assessmentData[peerId][questionId][type] = value;
+            updateProgress();
+            updateSubmitButton();
+        }
+        
+        function updateProgress() {
+            const totalQuestions = Object.keys(questionDefinitions).length;
+            const totalPeers = allStudents ? allStudents.length : 0;
+            const totalAssessments = totalQuestions * totalPeers;
+            
+            let completedScores = 0;
+            
+            Object.keys(assessmentData).forEach(peerId => {
+                Object.keys(assessmentData[peerId]).forEach(questionId => {
+                    if (assessmentData[peerId][questionId].score) {
+                        completedScores++;
+                    }
+                });
+            });
+            
+            const progressPercent = totalAssessments > 0 ? Math.round((completedScores / totalAssessments) * 100) : 0;
+            
+            document.getElementById('progressFill').style.width = progressPercent + '%';
+            document.getElementById('progressText').textContent = 
+                `${progressPercent}% Complete (${completedScores}/${totalAssessments} assessments)`;
+        }
+        
+        function updateSubmitButton() {
+            if (!currentlyEvaluating) return;
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const submitAllBtn = document.getElementById('submitAllBtn');
+            const totalQuestions = Object.keys(questionDefinitions).length;
+            
+            // Check if current assessment is complete
+            let currentCompleted = 0;
+            const currentData = assessmentData[currentlyEvaluating];
+            if (currentData) {
+                Object.keys(currentData).forEach(questionId => {
+                    if (currentData[questionId].score) {
+                        currentCompleted++;
+                    }
+                });
+            }
+            
+            submitBtn.disabled = currentCompleted < totalQuestions;
+            
+            // For faculty or if all assessments are complete, show submit all option
+            const totalCompleted = completedAssessments.size + (currentCompleted === totalQuestions ? 1 : 0);
+            const totalPeers = allStudents ? allStudents.length : 0;
+            
+            if (userSession.role === 'instructor' || userSession.isFaculty || totalCompleted === totalPeers) {
+                submitAllBtn.style.display = 'block';
+                submitAllBtn.disabled = Object.keys(assessmentData).length === 0;
+            }
+        }
+        
+        async function submitCurrentAssessment() {
+            if (!currentlyEvaluating) return;
+            
+            try {
+                const submitBtn = document.getElementById('submitBtn');
+                submitBtn.disabled = true;
+                submitBtn.textContent = '⏳ Submitting...';
+                
+                const submissions = transformSingleAssessmentData(currentlyEvaluating);
+                const result = await submitAssessmentsToBackend(submissions);
+                
+                if (result.success) {
+                    showSuccess('✅ Assessment submitted successfully!');
+                    completedAssessments.add(currentlyEvaluating);
+                    currentlyEvaluating = null;
+                    
+                    // Go back to student selector
+                    setTimeout(() => {
+                        showStudentSelector();
+                    }, 1500);
+                } else {
+                    throw new Error(result.error || 'Submission failed');
+                }
+                
+            } catch (error) {
+                console.error('Submission error:', error);
+                showError('❌ Failed to submit assessment: ' + error.message);
+                
+                const submitBtn = document.getElementById('submitBtn');
+                submitBtn.disabled = false;
+                submitBtn.textContent = '📝 Submit Assessment';
+            }
+        }
+        
+        async function submitAllAssessments() {
+            try {
+                const submitAllBtn = document.getElementById('submitAllBtn');
+                submitAllBtn.disabled = true;
+                submitAllBtn.textContent = '⏳ Submitting All...';
+                
+                const submissions = transformAllAssessmentData();
+                const result = await submitAssessmentsToBackend(submissions);
+                
+                if (result.success) {
+                    showSuccess('🎉 All assessments submitted successfully!');
+                    disableForm();
+                } else {
+                    throw new Error(result.error || 'Submission failed');
+                }
+                
+            } catch (error) {
+                console.error('Submission error:', error);
+                showError('❌ Failed to submit all assessments: ' + error.message);
+                
+                const submitAllBtn = document.getElementById('submitAllBtn');
+                submitAllBtn.disabled = false;
+                submitAllBtn.textContent = '🎯 Submit All Assessments';
+            }
+        }
+        
+        function transformSingleAssessmentData(peerId) {
+            const submissions = [];
+            const timestamp = new Date().toISOString();
+            const submissionId = `SUBM_${userSession.studentId}_${peerId}_${Date.now()}`;
+            
+            const peerData = assessmentData[peerId];
+            if (!peerData) return submissions;
+            
+            const peerInfo = allStudents.find(m => m.studentId === peerId);
+            
+            Object.keys(peerData).forEach(questionId => {
+                const assessment = peerData[questionId];
+                
+                if (assessment.score) {
+                    submissions.push({
+                        submissionId, timestamp,
+                        evaluatorId: userSession.studentId,
+                        evaluatorEmail: userSession.email,
+                        evaluatedStudentId: peerId,
+                        evaluatedStudentName: peerInfo ? peerInfo.studentName : peerId,
+                        unitContextOfEvaluation: userSession.productionUnit,
+                        questionId: questionId,
+                        responseType: 'SCORE',
+                        responseValue: assessment.score
+                    });
+                }
+                
+                if (assessment.comment && assessment.comment.trim()) {
+                    submissions.push({
+                        submissionId, timestamp,
+                        evaluatorId: userSession.studentId,
+                        evaluatorEmail: userSession.email,
+                        evaluatedStudentId: peerId,
+                        evaluatedStudentName: peerInfo ? peerInfo.studentName : peerId,
+                        unitContextOfEvaluation: userSession.productionUnit,
+                        questionId: questionId,
+                        responseType: 'COMMENT',
+                        responseValue: assessment.comment.trim()
+                    });
+                }
+            });
+            
+            return submissions;
+        }
+        
+        function transformAllAssessmentData() {
+            const submissions = [];
+            const timestamp = new Date().toISOString();
+            const submissionId = `SUBM_${userSession.studentId}_ALL_${Date.now()}`;
+            
+            Object.keys(assessmentData).forEach(peerId => {
+                const peerInfo = allStudents.find(m => m.studentId === peerId);
+                
+                Object.keys(assessmentData[peerId]).forEach(questionId => {
+                    const assessment = assessmentData[peerId][questionId];
+                    
+                    if (assessment.score) {
+                        submissions.push({
+                            submissionId, timestamp,
+                            evaluatorId: userSession.studentId,
+                            evaluatorEmail: userSession.email,
+                            evaluatedStudentId: peerId,
+                            evaluatedStudentName: peerInfo ? peerInfo.studentName : peerId,
+                            unitContextOfEvaluation: userSession.productionUnit,
+                            questionId: questionId,
+                            responseType: 'SCORE',
+                            responseValue: assessment.score
+                        });
+                    }
+                    
+                    if (assessment.comment && assessment.comment.trim()) {
+                        submissions.push({
+                            submissionId, timestamp,
+                            evaluatorId: userSession.studentId,
+                            evaluatorEmail: userSession.email,
+                            evaluatedStudentId: peerId,
+                            evaluatedStudentName: peerInfo ? peerInfo.studentName : peerId,
+                            unitContextOfEvaluation: userSession.productionUnit,
+                            questionId: questionId,
+                            responseType: 'COMMENT',
+                            responseValue: assessment.comment.trim()
+                        });
+                    }
+                });
+            });
+            
+            return submissions;
+        }
+        
+        function updateCompletedAssessments() {
+            const container = document.getElementById('completedContainer');
+            const list = document.getElementById('completedList');
+            
+            if (completedAssessments.size === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            
+            list.innerHTML = '';
+            completedAssessments.forEach(studentId => {
+                const member = allStudents.find(m => m.studentId === studentId);
+                if (member) {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <span>${member.studentName} (${member.studentId}) ${member.productionUnit ? `- Unit ${member.productionUnit}` : ''}</span>
+                        <button class="edit-btn" onclick="editAssessment('${studentId}')">Edit</button>
+                    `;
+                    list.appendChild(li);
+                }
+            });
+            
+            container.style.display = 'block';
+        }
+        
+        function editAssessment(studentId) {
+            // Remove from completed set to allow editing
+            completedAssessments.delete(studentId);
+            showAssessmentForm(studentId);
+        }
+        
+        function disableForm() {
+            document.querySelectorAll('input, textarea, button').forEach(element => {
+                element.disabled = true;
+            });
+            document.getElementById('assessmentContainer').style.opacity = '0.6';
+            document.getElementById('studentSelector').style.opacity = '0.6';
+        }
+        
+        function showLoading(show) {
+            document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+            document.getElementById('studentSelector').style.display = show ? 'none' : 'none';
+            document.getElementById('assessmentContainer').style.display = show ? 'none' : 'none';
+            document.getElementById('submitContainer').style.display = show ? 'none' : 'none';
+        }
+        
+        function showError(message) {
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.textContent = message;
+            errorContainer.style.display = 'block';
+            setTimeout(() => errorContainer.style.display = 'none', 8000);
+        }
+        
+        function showSuccess(message) {
+            const successContainer = document.getElementById('successContainer');
+            successContainer.textContent = message;
+            successContainer.style.display = 'block';
+            setTimeout(() => successContainer.style.display = 'none', 8000);
+        }
+        
+        function updateUserDisplay() {
+            if (userSession) {
+                document.getElementById('userName').textContent = userSession.studentName || 'User';
+                
+                // Show role indicator
+                const roleIndicator = document.getElementById('roleIndicator');
+                if (userSession.role === 'instructor' || userSession.isFaculty) {
+                    roleIndicator.textContent = 'Faculty';
+                    roleIndicator.style.background = 'rgba(255, 193, 7, 0.8)';
+                } else {
+                    roleIndicator.textContent = 'Student';
+                    roleIndicator.style.background = 'rgba(40, 167, 69, 0.8)';
+                }
+                
+                document.getElementById('userDetails').innerHTML = 
+                    `Student ID: ${userSession.studentId || 'Unknown'} | Production Unit: ${userSession.productionUnit || 'Unknown'}`;
+            }
+        }
+        
+        // API Functions
+        async function getUserSession() {
+            return new Promise((resolve, reject) => {
+                google.script.run
+                    .withSuccessHandler(resolve)
+                    .withFailureHandler(reject)
+                    .getCurrentUserSession();
+            });
+        }
+        
+        async function getQuestionDefinitions() {
+            return new Promise((resolve, reject) => {
+                google.script.run
+                    .withSuccessHandler(resolve)
+                    .withFailureHandler(reject)
+                    .getQuestionDefinitions();
+            });
+        }
+        
+        async function submitAssessmentsToBackend(submissions) {
+            return new Promise((resolve, reject) => {
+                google.script.run
+                    .withSuccessHandler(resolve)
+                    .withFailureHandler(reject)
+                    .submitPeerAssessments(submissions);
+            });
+        }
+    </script>
+</body>
+</html>

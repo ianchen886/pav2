@@ -25,21 +25,125 @@
 // // eslint-disable-next-line no-unused-vars
 function isValidShuEmail(email) {
   if (typeof email !== 'string') return false;
-  const emailPattern = /^[a-z]{1}[0-9]{9}@mail\.shu\.edu\.tw$/;
-  return emailPattern.test(email.toLowerCase());
+  
+  // Student format: one lowercase letter, followed by 9 digits
+  const studentEmailPattern = /^[a-z]{1}[0-9]{9}@mail\.shu\.edu\.tw$/;
+  
+  // Faculty/staff format: letters and possibly numbers, no specific length requirement
+  const facultyEmailPattern = /^[a-z][a-z0-9]*@mail\.shu\.edu\.tw$/;
+  
+  const lowerEmail = email.toLowerCase();
+  return studentEmailPattern.test(lowerEmail) || facultyEmailPattern.test(lowerEmail);
+}
+
+
+/**
+ * Extracts the student ID from a valid SHU email address, or creates a faculty ID
+ * @param {string} email The SHU email address.
+ * @returns {string|null} The uppercase student ID, faculty ID, or null if invalid format.
+ */
+function extractStudentIdFromEmail(email) {
+  if (!isValidShuEmail(email)) return null;
+  
+  const idPart = email.split('@')[0];
+  
+  // Check if it's student format (1 letter + 9 digits)
+  const studentPattern = /^[a-z]{1}[0-9]{9}$/;
+  if (studentPattern.test(idPart.toLowerCase())) {
+    return idPart.toUpperCase();
+  }
+  
+  // For faculty/staff, create a special ID format
+  return 'FACULTY_' + idPart.toUpperCase();
 }
 
 /**
- * Extracts the student ID (the part before '@') from a valid SHU email address.
- * The extracted ID is converted to uppercase.
- * @param {string} email The SHU email address.
- * @returns {string|null} The uppercase student ID, or null if the email is not a valid SHU format.
+ * Check if an email belongs to a faculty member
+ * @param {string} email The email to check
+ * @returns {boolean} True if faculty email format
  */
-// eslint-disable-next-line no-unused-vars
-function extractStudentIdFromEmail(email) {
-  if (!isValidShuEmail(email)) return null; // Calls local isValidShuEmail
+function isFacultyEmail(email) {
+  if (!isValidShuEmail(email)) return false;
+  
   const idPart = email.split('@')[0];
-  return idPart.toUpperCase(); 
+  const studentPattern = /^[a-z]{1}[0-9]{9}$/;
+  
+  // If it doesn't match student pattern but is valid SHU email, it's faculty
+  return !studentPattern.test(idPart.toLowerCase());
+}
+
+/**
+ * Updated getCurrentUserSession to handle faculty access
+ */
+function getCurrentUserSession() {
+  Logger.log('getCurrentUserSession called');
+  
+  try {
+    // Get the current user's email
+    const userEmail = Session.getActiveUser().getEmail();
+    Logger.log('Current user email: ' + userEmail);
+    
+    if (!userEmail) {
+      throw new Error('No authenticated user found');
+    }
+    
+    // Validate that it's a valid SHU email (student or faculty)
+    if (!isValidShuEmail(userEmail)) {
+      throw new Error('Access denied. Please use your SHU email account.');
+    }
+    
+    // Extract ID from email
+    const userId = extractStudentIdFromEmail(userEmail);
+    if (!userId) {
+      throw new Error('Could not extract user ID from email');
+    }
+    
+    // Check if faculty
+    if (isFacultyEmail(userEmail)) {
+      Logger.log('Faculty user detected: ' + userId);
+      
+      // Return faculty session
+      return {
+        isAuthenticated: true,
+        studentId: userId,
+        studentName: 'Faculty Member',
+        email: userEmail,
+        productionUnit: 'FACULTY',
+        unitMembers: [],
+        timestamp: new Date().toISOString(),
+        role: 'instructor',
+        isFaculty: true
+      };
+    }
+    
+    // For students, continue with existing logic
+    const studentInfo = getStudentFromMasterList(userId);
+    if (!studentInfo) {
+      throw new Error('Student not found in master list. Please contact your instructor.');
+    }
+    
+    const unitMembers = getUnitMembers(studentInfo);
+    
+    return {
+      isAuthenticated: true,
+      studentId: studentInfo.studentId,
+      studentName: studentInfo.studentName,
+      email: userEmail,
+      productionUnit: studentInfo.productionUnit1,
+      unitMembers: unitMembers,
+      timestamp: new Date().toISOString(),
+      role: 'student',
+      isFaculty: false
+    };
+    
+  } catch (error) {
+    Logger.log('Error in getCurrentUserSession: ' + error.toString());
+    return {
+      isAuthenticated: false,
+      error: error.toString(),
+      timestamp: new Date().toISOString()
+    };
+  }
 }
 
 /**

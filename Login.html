@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peer Assessment System - Login</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            margin: 0 auto 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 36px;
+            font-weight: bold;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 16px;
+            line-height: 1.4;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .form-group {
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input[type="email"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e1e1;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        input[type="email"]:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .google-login-btn {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .google-login-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .google-login-btn:hover::before {
+            left: 100%;
+        }
+
+        .google-login-btn:hover {
+            background: #3367d6;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(66, 133, 244, 0.4);
+        }
+
+        .google-login-btn:active {
+            transform: translateY(0);
+        }
+
+        .google-icon {
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #4285f4;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .divider {
+            margin: 30px 0;
+            position: relative;
+            color: #999;
+            font-size: 14px;
+        }
+
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(to right, transparent, #e1e1e1, transparent);
+        }
+
+        .divider span {
+            background: white;
+            padding: 0 20px;
+            position: relative;
+        }
+
+        .manual-login-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .manual-login-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .manual-login-btn:hover::before {
+            left: 100%;
+        }
+
+        .manual-login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .manual-login-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .manual-login-btn:disabled::before {
+            display: none;
+        }
+
+        .error-message {
+            background: linear-gradient(135deg, #fee, #fdd);
+            color: #c33;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #c33;
+            display: none;
+            font-size: 14px;
+            line-height: 1.4;
+            animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .success-message {
+            background: linear-gradient(135deg, #dfd, #efe);
+            color: #363;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #363;
+            display: none;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .loading {
+            display: none;
+            color: #667eea;
+            margin-top: 20px;
+            font-size: 16px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e1e1e1;
+            color: #999;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .role-badge {
+            display: inline-block;
+            background: #f0f0f0;
+            color: #666;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .student-badge {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .instructor-badge {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 30px 20px;
+                margin: 0 10px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+
+            .logo {
+                width: 60px;
+                height: 60px;
+                font-size: 28px;
+            }
+
+            .google-login-btn,
+            .manual-login-btn {
+                padding: 12px 24px;
+                font-size: 15px;
+            }
+        }
+
+        /* Email validation styling */
+        .email-valid {
+            border-color: #4caf50 !important;
+            background: #f8fff8 !important;
+        }
+
+        .email-invalid {
+            border-color: #f44336 !important;
+            background: #fff8f8 !important;
+        }
+
+        .validation-message {
+            font-size: 12px;
+            margin-top: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .validation-success {
+            color: #4caf50;
+        }
+
+        .validation-error {
+            color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">PA</div>
+        <h1>Peer Assessment</h1>
+        <p class="subtitle">Sign in to access your peer evaluation system</p>
+        
+        <div class="error-message" id="errorMessage"></div>
+        <div class="success-message" id="successMessage"></div>
+        
+        <form class="login-form" id="loginForm">
+            <!-- Google Login Option -->
+            <button type="button" class="google-login-btn" id="googleLoginBtn">
+                <div class="google-icon">G</div>
+                Sign in with Google
+            </button>
+            
+            <div class="divider">
+                <span>or</span>
+            </div>
+            
+            <!-- Manual Email Entry -->
+            <div class="form-group">
+                <label for="email">SHU Email Address</label>
+                <input type="email" id="email" name="email" placeholder="x123456789@mail.shu.edu.tw" required>
+                <div class="validation-message" id="emailValidation"></div>
+            </div>
+            
+            <button type="submit" class="manual-login-btn" id="manualLoginBtn">
+                Continue with Email
+            </button>
+        </form>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            Authenticating...
+        </div>
+        
+        <div class="footer">
+            <p>🔒 Secure authentication powered by Google</p>
+            <p>Shih Hsin University Peer Assessment System</p>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentUser = null;
+        let isLoading = false;
+        
+        // Initialize page when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initializePage();
+        });
+        
+        /**
+         * Initialize the login page
+         */
+        function initializePage() {
+            console.log('Initializing login page...');
+            
+            // Check if user is already authenticated
+            google.script.run
+                .withSuccessHandler(handleUserInfo)
+                .withFailureHandler(handleError)
+                .getCurrentUser();
+        }
+        
+        /**
+         * Handle user info response from server
+         */
+        function handleUserInfo(user) {
+            console.log('User info received:', user);
+            
+            if (user && user.email && user.isAuthenticated) {
+                currentUser = user;
+                showSuccess(`Welcome back, ${user.studentInfo ? user.studentInfo.studentName : user.email}!`);
+                
+                // Redirect to main app after a short delay
+                setTimeout(() => {
+                    redirectToMainApp(user);
+                }, 1500);
+            } else {
+                // User not authenticated, show login form
+                setupLoginHandlers();
+            }
+        }
+        
+        /**
+         * Set up event handlers for login form
+         */
+        function setupLoginHandlers() {
+            console.log('Setting up login handlers...');
+            
+            // Google Login Button
+            const googleBtn = document.getElementById('googleLoginBtn');
+            googleBtn.addEventListener('click', handleGoogleLogin);
+            
+            // Manual Login Form
+            const loginForm = document.getElementById('loginForm');
+            loginForm.addEventListener('submit', handleManualLogin);
+            
+            // Email input validation
+            const emailInput = document.getElementById('email');
+            emailInput.addEventListener('input', handleEmailInput);
+            emailInput.addEventListener('blur', validateEmailInput);
+        }
+        
+        /**
+         * Handle Google login button click
+         */
+        function handleGoogleLogin() {
+            if (isLoading) return;
+            
+            console.log('Google login initiated...');
+            showLoading(true);
+            hideMessages();
+            
+            // Use Google Apps Script's built-in authentication
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    showLoading(false);
+                    console.log('Google auth result:', result);
+                    
+                    if (result && result.success && result.email) {
+                        showSuccess(`Welcome, ${result.studentInfo ? result.studentInfo.studentName : result.email}!`);
+                        setTimeout(() => {
+                            redirectToMainApp(result);
+                        }, 1500);
+                    } else {
+                        showError(result.message || 'Google authentication failed. Please try again.');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    showLoading(false);
+                    console.error('Google auth error:', error);
+                    showError('Google authentication failed: ' + error.message);
+                })
+                .authenticateUser();
+        }
+        
+        /**
+         * Handle manual login form submission
+         */
+        function handleManualLogin(e) {
+            e.preventDefault();
+            
+            if (isLoading) return;
+            
+            const email = document.getElementById('email').value.trim();
+            
+            console.log('Manual login attempted with email:', email);
+            
+            if (!email) {
+                showError('Please enter your email address.');
+                return;
+            }
+            
+            if (!validateEmail(email)) {
+                showError('Please enter a valid SHU email address (format: x123456789@mail.shu.edu.tw).');
+                return;
+            }
+            
+            showLoading(true);
+            hideMessages();
+            
+            // Verify email against student database
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    showLoading(false);
+                    console.log('Email verification result:', result);
+                    
+                    if (result.success) {
+                        showSuccess(`Email verified! Welcome, ${result.student.studentName}!`);
+                        setTimeout(() => {
+                            redirectToMainApp({
+                                email: result.student.email,
+                                isAuthenticated: true,
+                                studentInfo: result.student
+                            });
+                        }, 1500);
+                    } else {
+                        showError(result.message || 'Email not found in student database.');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    showLoading(false);
+                    console.error('Email verification error:', error);
+                    showError('Verification failed: ' + error.message);
+                })
+                .verifyStudentEmail(email);
+        }
+        
+        /**
+         * Handle email input changes (real-time validation)
+         */
+        function handleEmailInput(e) {
+            const email = e.target.value.trim();
+            const emailInput = e.target;
+            const validation = document.getElementById('emailValidation');
+            
+            if (email === '') {
+                emailInput.className = '';
+                validation.textContent = '';
+                return;
+            }
+            
+            if (validateEmail(email)) {
+                emailInput.className = 'email-valid';
+                validation.textContent = '✓ Valid SHU email format';
+                validation.className = 'validation-message validation-success';
+            } else {
+                emailInput.className = 'email-invalid';
+                validation.textContent = '✗ Use format: x123456789@mail.shu.edu.tw';
+                validation.className = 'validation-message validation-error';
+            }
+        }
+        
+        /**
+         * Validate email input on blur
+         */
+        function validateEmailInput(e) {
+            const email = e.target.value.trim();
+            if (email && !validateEmail(email)) {
+                showError('Please enter a valid SHU email address.');
+            }
+        }
+        
+        /**
+         * Validate SHU email format
+         */
+        function validateEmail(email) {
+            // SHU email format: single letter + 9 digits + @mail.shu.edu.tw
+            const shuEmailPattern = /^[a-zA-Z]{1}[0-9]{9}@mail\.shu\.edu\.tw$/;
+            return shuEmailPattern.test(email);
+        }
+        
+        /**
+         * Redirect to main application
+         */
+        function redirectToMainApp(user) {
+            console.log('Redirecting to main app for user:', user);
+            
+            google.script.run
+                .withSuccessHandler(function(url) {
+                    console.log('Redirecting to:', url);
+                    window.location.href = url;
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Redirect failed:', error);
+                    showError('Redirect failed: ' + error.message);
+                })
+                .getMainAppUrl(user);
+        }
+        
+        /**
+         * Show loading state
+         */
+        function showLoading(show) {
+            isLoading = show;
+            const loading = document.getElementById('loading');
+            const loginForm = document.getElementById('loginForm');
+            
+            if (show) {
+                loading.style.display = 'block';
+                loginForm.style.display = 'none';
+            } else {
+                loading.style.display = 'none';
+                loginForm.style.display = 'block';
+            }
+        }
+        
+        /**
+         * Show error message
+         */
+        function showError(message) {
+            console.error('Error:', message);
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            
+            // Hide success message
+            document.getElementById('successMessage').style.display = 'none';
+        }
+        
+        /**
+         * Show success message
+         */
+        function showSuccess(message) {
+            console.log('Success:', message);
+            const successDiv = document.getElementById('successMessage');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            
+            // Hide error message
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+        
+        /**
+         * Hide all messages
+         */
+        function hideMessages() {
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('successMessage').style.display = 'none';
+        }
+        
+        /**
+         * Handle general errors
+         */
+        function handleError(error) {
+            console.error('General error:', error);
+            showError('An error occurred: ' + error.message);
+        }
+    </script>
+</body>
+</html>
