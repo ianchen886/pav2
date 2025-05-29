@@ -14,8 +14,6 @@
  * @requires Utils.js (for calculateMean, calculateMedianFromArray functions)
  */
 
-// In Workflow_Scoring.gs // Your existing comment
-
 /**
  * Calculates weighted peer assessment scores for each student and updates the
  * 'PaFinalScoresSummary' sheet.
@@ -40,7 +38,6 @@
  */
 // eslint-disable-next-line no-unused-vars
 function calculateWeightedScoresAndUpdateSheet() {
-  const ui = SpreadsheetApp.getUi(); // GAS services from eslint.config.mjs
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   Logger.clear();
   Logger.log("--- calculateWeightedScoresAndUpdateSheet: Starting (Using V2 Parser, camelCase Headers) ---");
@@ -49,30 +46,30 @@ function calculateWeightedScoresAndUpdateSheet() {
 
   const parsedData = parseRawSurveyData(); 
   if (!parsedData || !parsedData.students || !parsedData.responses || !parsedData.questions) {
-    ui.alert("Data Parsing Error", "Could not parse data using V2 parser. Cannot calculate scores.", ui.ButtonSet.OK);
-    Logger.log("ERROR: V2 Parsed data is invalid or incomplete (students, questions, or responses missing).");
-    return;
+    const errorMsg = "ERROR: V2 Parsed data is invalid or incomplete (students, questions, or responses missing).";
+    Logger.log(errorMsg);
+    throw new Error("Could not parse data using V2 parser. Cannot calculate scores.");
   }
   const { students: allStudentsFromMaster, questions, responses } = parsedData; 
   if (Object.keys(allStudentsFromMaster).length === 0 || Object.keys(questions).length === 0) {
-    ui.alert("Data Parsing Info", "No active students or no questions parsed. Cannot calculate scores.", ui.ButtonSet.OK);
-    Logger.log(`INFO: No active students (${Object.keys(allStudentsFromMaster).length}) or no questions (${Object.keys(questions).length}) parsed. Aborting score calculation.`);
-    return;
+    const errorMsg = `INFO: No active students (${Object.keys(allStudentsFromMaster).length}) or no questions (${Object.keys(questions).length}) parsed. Aborting score calculation.`;
+    Logger.log(errorMsg);
+    throw new Error("No active students or no questions parsed. Cannot calculate scores.");
   }
   Logger.log(`V2 Parsed data: ${Object.keys(allStudentsFromMaster).length} active students, ${Object.keys(questions).length} questions, ${responses.length} responses.`);
 
   const evaluatorWeights = generateEvaluatorAnalyticsAndWeights(); 
   if (!evaluatorWeights) { 
-    ui.alert("Weighting Error", "Critical error: Could not retrieve evaluator weights (function returned null). Scores cannot be calculated.", ui.ButtonSet.OK);
-    Logger.log("CRITICAL ERROR: Evaluator weights function (generateEvaluatorAnalyticsAndWeights) returned null. Aborting score calculation.");
-    return; 
+    const errorMsg = "CRITICAL ERROR: Evaluator weights function (generateEvaluatorAnalyticsAndWeights) returned null. Aborting score calculation.";
+    Logger.log(errorMsg);
+    throw new Error("Critical error: Could not retrieve evaluator weights (function returned null). Scores cannot be calculated.");
   } else if (Object.keys(evaluatorWeights).length === 0) {
     Logger.log("Warning: Evaluator weights object is empty. All scores will effectively be unweighted or based on fallback logic if no evaluators had sufficient data for weighting.");
   } else {
     Logger.log(`Retrieved ${Object.keys(evaluatorWeights).length} evaluator weights.`);
   }
 
-  let targetSheet = ss.getSheetByName(targetSheetName); // Changed: var to let
+  let targetSheet = ss.getSheetByName(targetSheetName);
   if (targetSheet) {
     Logger.log(`Sheet "${targetSheetName}" found. Clearing contents and formats.`);
     targetSheet.clearContents().clearFormats(); 
@@ -85,7 +82,7 @@ function calculateWeightedScoresAndUpdateSheet() {
   const studentNameHeader = "studentName";
   const overallMedianHeader = "overallWeightedMedian";
   
-  const expectedHeadersInOrder = [studentIdHeader, studentNameHeader]; // Changed: var to const
+  const expectedHeadersInOrder = [studentIdHeader, studentNameHeader];
   const sortedQuestionIds = Object.keys(questions).sort(); 
   sortedQuestionIds.forEach(qId => expectedHeadersInOrder.push(qId.toLowerCase())); 
   expectedHeadersInOrder.push(overallMedianHeader);
@@ -100,8 +97,8 @@ function calculateWeightedScoresAndUpdateSheet() {
   const studentIdColTargetIdx = headerMap[studentIdHeader]; 
   const studentNameColTargetIdx = headerMap[studentNameHeader]; 
   
-  const questionColMapTarget = {}; // Changed: var to const
-  let overallMedianColNum = -1;  // Changed: var to let
+  const questionColMapTarget = {};
+  let overallMedianColNum = -1;
 
   expectedHeadersInOrder.forEach((header, index) => {
       if (header.match(/^q\d{1,2}$/)) { 
@@ -112,17 +109,17 @@ function calculateWeightedScoresAndUpdateSheet() {
   });
 
   if (Object.keys(questionColMapTarget).length !== sortedQuestionIds.length) {
-      Logger.log(`CRITICAL ERROR: Question column mapping failed for target sheet "${targetSheetName}". Expected ${sortedQuestionIds.length} question columns, mapped ${Object.keys(questionColMapTarget).length}.`);
-      ui.alert("Internal Error", "Failed to map question columns in target sheet. Check logs.", ui.ButtonSet.OK);
-      return; 
+      const errorMsg = `CRITICAL ERROR: Question column mapping failed for target sheet "${targetSheetName}". Expected ${sortedQuestionIds.length} question columns, mapped ${Object.keys(questionColMapTarget).length}.`;
+      Logger.log(errorMsg);
+      throw new Error("Failed to map question columns in target sheet. Check logs.");
   }
   if (expectedHeadersInOrder.includes(overallMedianHeader) && overallMedianColNum === -1) {
-     Logger.log(`CRITICAL ERROR: Overall median column mapping failed for target sheet "${targetSheetName}".`);
-     ui.alert("Internal Error", "Failed to map overall median column in target sheet. Check logs.", ui.ButtonSet.OK);
-     return;
+     const errorMsg = `CRITICAL ERROR: Overall median column mapping failed for target sheet "${targetSheetName}".`;
+     Logger.log(errorMsg);
+     throw new Error("Failed to map overall median column in target sheet. Check logs.");
   }
 
-  const studentsToAddRows = []; // Changed: var to const
+  const studentsToAddRows = [];
   const studentIdsFromMasterSorted = Object.keys(allStudentsFromMaster).sort((a,b) => {
     const studentA = allStudentsFromMaster[a];
     const studentB = allStudentsFromMaster[b];
@@ -151,9 +148,9 @@ function calculateWeightedScoresAndUpdateSheet() {
       return;
   }
   
-  const finalTargetSheetData = targetSheet.getDataRange().getValues(); // Changed: var to const
+  const finalTargetSheetData = targetSheet.getDataRange().getValues();
   
-  const updatesForSheet = []; // Changed: var to const
+  const updatesForSheet = [];
   
   for (let r = 1; r < finalTargetSheetData.length; r++) { 
     const evaluatedStudentId = finalTargetSheetData[r][studentIdColTargetIdx] ? finalTargetSheetData[r][studentIdColTargetIdx].toString().trim() : null;
@@ -187,7 +184,7 @@ function calculateWeightedScoresAndUpdateSheet() {
           const evaluatorId = resp.responseByStudentId;
           
           let evaluatorWeight = 0;
-          if (evaluatorId && evaluatorWeights && Object.prototype.hasOwnProperty.call(evaluatorWeights, evaluatorId)) { // Check own property
+          if (evaluatorId && evaluatorWeights && Object.prototype.hasOwnProperty.call(evaluatorWeights, evaluatorId)) {
               const w = evaluatorWeights[evaluatorId];
               if (typeof w === 'number' && !isNaN(w)) {
                   evaluatorWeight = w;
@@ -263,7 +260,7 @@ function calculateWeightedScoresAndUpdateSheet() {
         Logger.log(`Warning: autoResizeColumns failed. Error: ${e.message}`);
     }
     Logger.log(`Updated score/median cells in "${targetSheetName}".`);
-    ui.alert("Weighted Scores Updated", `WEIGHTED scores and overall medians updated in "${targetSheetName}".`, ui.ButtonSet.OK);
+    Logger.log("SUCCESS: WEIGHTED scores and overall medians updated successfully.");
   } else {
     Logger.log("No WEIGHTED scores or medians to update in target sheet (updatesForSheet array was empty).");
   }

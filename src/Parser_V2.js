@@ -12,17 +12,10 @@
  * for analytics, scoring, and reporting. It filters for active/enrolled students
  * and includes robust error handling and data validation.
  *
- * @requires Config.gs (for sheet name constants like PA_QUESTION_CONFIG_SHEET_NAME)
- * @requires Models.gs (for createQuestion, createStudent, createResponse functions)
- * @requires Utils.gs (for validation helper functions like isValidProductionUnit, isValidShuEmail)
+ * @requires Config.js (for sheet name constants like PA_QUESTION_CONFIG_SHEET_NAME)
+ * @requires Models.js (for createQuestion, createStudent, createResponse functions)
+ * @requires Utils.js (for validation helper functions like isValidProductionUnit, isValidShuEmail)
  */
-
-// ===================================================================================
-// FILE: Parser_V2.gs 
-// Purpose: To parse data from the NEW survey response format ("PaRawSubmissionsV2"),
-//          question configurations ("PaQuestionConfig"),
-//          and the master student list ("PaMasterStudentList").
-// ===================================================================================
 
 /**
  * Reads the 'PaQuestionConfig' Google Sheet to retrieve and structure all assessment questions.
@@ -36,12 +29,8 @@
  *                                   Returns an empty object if the sheet is not found,
  *                                   is empty, or critical headers are missing.
  */
-// NOTE: The 'no-unused-vars' disable line previously here might no longer be needed
-// if ESLint sees this function being called by parseRawSurveyData in the same file.
-// Test by removing it, and add back ONLY if ESLint still flags getQuestionDefinitions as unused.
 function getQuestionDefinitions() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const ui = ss.getUi(); // Corrected: getUi() is a method of Spreadsheet, not SpreadsheetApp directly for alerts in this context. Or use SpreadsheetApp.getUi() if preferred.
   Logger.log("getQuestionDefinitions: Starting to read PaQuestionConfig.");
 
   const configSheetName = PA_QUESTION_CONFIG_SHEET_NAME; 
@@ -49,14 +38,14 @@ function getQuestionDefinitions() {
   let questionsMap = {}; 
 
   if (!sheet) {
-    Logger.log(`getQuestionDefinitions ERROR: Question config sheet "${configSheetName}" not found.`);
-    ui.alert("Configuration Error", `Sheet "${configSheetName}" not found. Please create and populate it.`, ui.ButtonSet.OK); // Added more context to ui.alert
-    return questionsMap; 
+    const errorMsg = `getQuestionDefinitions ERROR: Question config sheet "${configSheetName}" not found.`;
+    Logger.log(errorMsg);
+    throw new Error(errorMsg);
   }
 
   const data = sheet.getDataRange().getValues();
   if (data.length < 2) { 
-    Logger.log(`getQuestionDefinitions WARNING: Sheet "${configSheetName}" is empty or has only headers. No questions loaded.`); // Added more context
+    Logger.log(`getQuestionDefinitions WARNING: Sheet "${configSheetName}" is empty or has only headers. No questions loaded.`);
     return questionsMap;
   }
 
@@ -69,9 +58,9 @@ function getQuestionDefinitions() {
   const instructionColConfigIdx = headers.indexOf("InstructionalComment");
 
   if (idColConfigIdx === -1 || textColConfigIdx === -1 || typeColConfigIdx === -1 ) {
-    Logger.log(`getQuestionDefinitions ERROR: Required headers (QuestionID, QuestionText, QuestionType) not found in "${configSheetName}". Found headers: [${headers.join(', ')}]`);
-    ui.alert("Configuration Error", `Required headers (QuestionID, QuestionText, QuestionType) missing in "${configSheetName}". Please check the sheet.`, ui.ButtonSet.OK);
-    return questionsMap; 
+    const errorMsg = `getQuestionDefinitions ERROR: Required headers (QuestionID, QuestionText, QuestionType) not found in "${configSheetName}". Found headers: [${headers.join(', ')}]`;
+    Logger.log(errorMsg);
+    throw new Error(errorMsg);
   }
 
   for (let i = 1; i < data.length; i++) { 
@@ -98,7 +87,6 @@ function getQuestionDefinitions() {
   return questionsMap;
 }
 
-
 /**
  * Parses all necessary raw data for the peer assessment system from Google Sheets.
  * This includes:
@@ -120,9 +108,7 @@ function getQuestionDefinitions() {
  */
 // eslint-disable-next-line no-unused-vars
 function parseRawSurveyData() { 
-  const ss = SpreadsheetApp.getActiveSpreadsheet(); // Corrected: var to const/let
-  const ui = ss.getUi(); // Corrected
-  // Logger.clear(); // Moved this to testNewParser where it's more appropriate for isolated testing.
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   Logger.log("parseRawSurveyData (V2): Starting data parsing from NEW format...");
 
   const listStudentsSheetName = PA_MASTER_STUDENT_LIST_SHEET_NAME;
@@ -131,30 +117,27 @@ function parseRawSurveyData() {
   // --- 1. Get Question Definitions ---
   const questionsFromConfig = getQuestionDefinitions(); 
   if (!questionsFromConfig || Object.keys(questionsFromConfig).length === 0) {
-    Logger.log("parseRawSurveyData (V2) ERROR: No questions loaded from config. Aborting.");
-    ui.alert("Configuration Error", "No questions were loaded from PaQuestionConfig. Cannot proceed.", ui.ButtonSet.OK);
-    return null;
+    const errorMsg = "parseRawSurveyData (V2) ERROR: No questions loaded from config. Aborting.";
+    Logger.log(errorMsg);
+    throw new Error(errorMsg);
   }
 
   // --- 2. Process PA_MASTER_STUDENT_LIST ---
-  const studentMasterListById = {};   // Corrected: var to const/let
-  const studentMasterListByName = {}; // Corrected
-  const listStudentsSheet = ss.getSheetByName(listStudentsSheetName); // Corrected
+  const studentMasterListById = {};
+  const studentMasterListByName = {};
+  const listStudentsSheet = ss.getSheetByName(listStudentsSheetName);
 
   if (!listStudentsSheet) { 
-      Logger.log(`parseRawSurveyData (V2) ERROR: Sheet "${listStudentsSheetName}" not found.`);
-      ui.alert("Prerequisite Error", `Sheet "${listStudentsSheetName}" not found. Please create it.`, ui.ButtonSet.OK);
-      return null; 
+      const errorMsg = `parseRawSurveyData (V2) ERROR: Sheet "${listStudentsSheetName}" not found.`;
+      Logger.log(errorMsg);
+      throw new Error(errorMsg);
   }
-  const listStudentsDataWithHeaders = listStudentsSheet.getDataRange().getValues(); // Corrected
+  const listStudentsDataWithHeaders = listStudentsSheet.getDataRange().getValues();
   if (listStudentsDataWithHeaders.length < 2) { 
       Logger.log(`parseRawSurveyData (V2) WARNING: Sheet "${listStudentsSheetName}" has no data rows (only headers or empty).`);
-      // No active students will be loaded, but this might not be a critical error if submissions can still be processed
-      // for ad-hoc students. The check later for Object.keys(allStudentsFromMaster).length will handle if no students are usable.
   }
 
-  const masterHeaders = listStudentsDataWithHeaders[0].map(h => h ? h.toString().trim() : ""); // Corrected
-  // Logger.log(`DEBUG_V2_PARSER (MasterList): Headers found: [${masterHeaders.join(' | ')}]`); // Keep for debugging if needed
+  const masterHeaders = listStudentsDataWithHeaders[0].map(h => h ? h.toString().trim() : "");
 
   const idColLsIdx = masterHeaders.indexOf("studentId");
   const nameColLsIdx = masterHeaders.indexOf("studentName");
@@ -163,34 +146,27 @@ function parseRawSurveyData() {
   const emailColLsIdx = masterHeaders.indexOf("email"); 
   const statusColLsIdx = masterHeaders.indexOf("status");
 
-  // Logger.log(`DEBUG_V2_PARSER (MasterList): Indices - studentId=${idColLsIdx}, studentName=${nameColLsIdx}, unit1=${unit1ColLsIdx}, unit2=${unit2ColLsIdx}, email=${emailColLsIdx}, status=${statusColLsIdx}`);
-
   if (idColLsIdx === -1 || nameColLsIdx === -1 || statusColLsIdx === -1) { 
-    Logger.log(`parseRawSurveyData (V2) ERROR: Required headers (studentId, studentName, status) not found in "${listStudentsSheetName}". Please check PaMasterStudentList headers.`);
-    ui.alert("Sheet Format Error", `Required headers (studentId, studentName, status) missing in "${listStudentsSheetName}". Check PaMasterStudentList headers.`, ui.ButtonSet.OK);
-    return null;
+    const errorMsg = `parseRawSurveyData (V2) ERROR: Required headers (studentId, studentName, status) not found in "${listStudentsSheetName}". Please check PaMasterStudentList headers.`;
+    Logger.log(errorMsg);
+    throw new Error(errorMsg);
   }
     
-  // Logger.log(`parseRawSurveyData (V2): Processing ${listStudentsDataWithHeaders.length - 1} potential student rows from "${listStudentsSheetName}".`);
   for (let i = 1; i < listStudentsDataWithHeaders.length; i++) {
     const rowData = listStudentsDataWithHeaders[i];
     
     const idFromSheet = (idColLsIdx !== -1 && rowData[idColLsIdx]) ? rowData[idColLsIdx].toString().trim().toUpperCase() : null;
     if (!idFromSheet || !(/^[A-Z]{1}[0-9]{9}$/.test(idFromSheet))) { 
-      // Logger.log(`DEBUG_V2_PARSER (MasterList Row ${i+1}): Skipping due to invalid/missing studentId: '${rowData[idColLsIdx]}'`);
       continue; 
     }
 
     let nameFromSheet = `[NameDefaultInParserFor_${idFromSheet}]`;
     if (nameColLsIdx !== -1 && rowData[nameColLsIdx] && rowData[nameColLsIdx].toString().trim() !== "") {
         nameFromSheet = rowData[nameColLsIdx].toString().trim();
-    } else {
-        // Logger.log(`DEBUG_V2_PARSER (MasterList Row ${i+1}): Name issue for ID ${idFromSheet}. RawNameCell='${rowData[nameColLsIdx]}'. Name set to placeholder: '${nameFromSheet}'`);
     }
     
     const statusFromSheet = (statusColLsIdx !== -1 && rowData[statusColLsIdx]) ? rowData[statusColLsIdx].toString().trim().toLowerCase() : "active"; 
     if (!(statusFromSheet === "active" || statusFromSheet === "enrolled")) {
-      // Logger.log(`parseRawSurveyData (V2): Skipping inactive student from master: ${idFromSheet} - ${nameFromSheet} (Status: ${statusFromSheet})`);
       continue; 
     }
 
@@ -207,23 +183,19 @@ function parseRawSurveyData() {
         if (rowData[emailColLsIdx] && rowData[emailColLsIdx].toString().trim() !== "") {
             emailFromSheet = rowData[emailColLsIdx].toString().trim().toLowerCase();
             if (!isValidShuEmail(emailFromSheet)) {
-                // Logger.log(`DEBUG_V2_PARSER (MasterList Row ${i+1}): Invalid email format '${rowData[emailColLsIdx]}' for ID ${idFromSheet}. Will try to derive.`);
                 emailFromSheet = ""; 
             }
         }
-    } else {
-        // Logger.log(`DEBUG_V2_PARSER (MasterList Row ${i+1}): Email header not found for ID ${idFromSheet}. Trying to derive.`);
     }
 
-    if (!emailFromSheet && idFromSheet && /^[A-Z]{1}[0-9]{9}$/.test(idFromSheet)) { // Check ID format for derivation
+    if (!emailFromSheet && idFromSheet && /^[A-Z]{1}[0-9]{9}$/.test(idFromSheet)) {
         let derivedEmail = idFromSheet.toLowerCase() + "@mail.shu.edu.tw";
         if (isValidShuEmail(derivedEmail)) {
             emailFromSheet = derivedEmail;
         } else {
             emailFromSheet = `[NoValidEmailFor_${idFromSheet}]`; 
-            // Logger.log(`DEBUG_V2_PARSER (MasterList Row ${i+1}): Email for ${idFromSheet} could not be derived into a valid SHU format.`);
         }
-    } else if (!emailFromSheet) { // If still no email (e.g. ID was not SHU format for derivation)
+    } else if (!emailFromSheet) {
         emailFromSheet = `[NoEmailProvidedOrDerivedFor_${idFromSheet}]`;
     }
     
@@ -246,14 +218,9 @@ function parseRawSurveyData() {
   } 
   const allStudentsFromMaster = studentMasterListById; 
   Logger.log(`parseRawSurveyData (V2): Populated allStudentsFromMaster with ${Object.keys(allStudentsFromMaster).length} active/enrolled students.`);
-  
-  if (Object.keys(allStudentsFromMaster).length === 0 && listStudentsDataWithHeaders.length > 1) { 
-    // ui.alert("Data Error", `No active/enrolled students loaded from "${listStudentsSheetName}". Check student statuses and IDs.`, ui.ButtonSet.OK);
-    // Allow proceeding as submissions might still be processable if they contain all info, or for testing.
-  }
 
   // --- 3. Process PA_RAW_SUBMISSIONS_V2 (New Format Responses) ---
-  const surveySheet = ss.getSheetByName(rawSubmissionsSheetName); // Corrected: var to const
+  const surveySheet = ss.getSheetByName(rawSubmissionsSheetName);
   let responsesArray = [];
 
   if (!surveySheet) { 
@@ -264,7 +231,7 @@ function parseRawSurveyData() {
         responses: responsesArray 
       };
   }
-  const rawDataFromSurvey = surveySheet.getDataRange().getValues(); // Corrected
+  const rawDataFromSurvey = surveySheet.getDataRange().getValues();
   if (rawDataFromSurvey.length < 2) { 
       Logger.log(`parseRawSurveyData (V2) INFO: Raw submissions sheet "${rawSubmissionsSheetName}" is empty or has only headers. No responses to process.`);
       return { 
@@ -273,7 +240,7 @@ function parseRawSurveyData() {
         responses: responsesArray 
       };
   }
-  const submissionHeaders = rawDataFromSurvey[0].map(h => h ? h.toString().trim() : ""); // Corrected
+  const submissionHeaders = rawDataFromSurvey[0].map(h => h ? h.toString().trim() : "");
 
   const evaluatorIdCol = submissionHeaders.indexOf("evaluatorId");
   const evaluatedStudentIdCol = submissionHeaders.indexOf("evaluatedStudentId");
@@ -285,8 +252,8 @@ function parseRawSurveyData() {
   const unitContextCol = submissionHeaders.indexOf("unitContextOfEvaluation");
 
   if (evaluatorIdCol === -1 || evaluatedStudentIdCol === -1 || questionIdCol === -1 || responseTypeCol === -1 || responseValueCol === -1) {
-      Logger.log(`parseRawSurveyData (V2) ERROR: Required headers missing in "${rawSubmissionsSheetName}". Found: [${submissionHeaders.join(', ')}]. Expected: evaluatorId, evaluatedStudentId, questionId, responseType, responseValue.`);
-      ui.alert("Submission Sheet Error", `Required headers missing in "${rawSubmissionsSheetName}". Cannot process responses.`, ui.ButtonSet.OK);
+      const errorMsg = `parseRawSurveyData (V2) ERROR: Required headers missing in "${rawSubmissionsSheetName}". Found: [${submissionHeaders.join(', ')}]. Expected: evaluatorId, evaluatedStudentId, questionId, responseType, responseValue.`;
+      Logger.log(errorMsg);
       return { students: allStudentsFromMaster, questions: questionsFromConfig, responses: [] }; 
   }
 
@@ -302,18 +269,16 @@ function parseRawSurveyData() {
     const questionIdFromRow = (questionIdCol !== -1 && row[questionIdCol]) ? row[questionIdCol].toString().trim().toUpperCase() : null;
     const responseTypeFromRow = (responseTypeCol !== -1 && row[responseTypeCol]) ? row[responseTypeCol].toString().trim().toUpperCase() : null;
     const responseValueFromRow = (responseValueCol !== -1) ? row[responseValueCol] : undefined; 
-    const timestampFromRow = (timestampCol !== -1 && row[timestampCol]) ? (row[timestampCol] instanceof Date ? row[timestampCol].toISOString() : row[timestampCol].toString()) : new Date().toISOString(); // Handle Date objects from sheet
+    const timestampFromRow = (timestampCol !== -1 && row[timestampCol]) ? (row[timestampCol] instanceof Date ? row[timestampCol].toISOString() : row[timestampCol].toString()) : new Date().toISOString();
     let unitContextFromRow = (unitContextCol !== -1 && row[unitContextCol]) ? row[unitContextCol].toString().trim().toUpperCase() : "";
     if (unitContextFromRow && !isValidProductionUnit(unitContextFromRow)) unitContextFromRow = ""; 
 
     if (!evaluatorIdFromRow || !evaluatedStudentIdFromRow || !questionIdFromRow || !responseTypeFromRow || responseValueFromRow === undefined || responseValueFromRow === null) {
-        // Logger.log(`parseRawSurveyData (V2) WARNING: Skipping survey row ${i+1} due to missing essential data (IDs, QID, Type, Value). EvaluatorID: ${evaluatorIdFromRow}, EvaluatedID: ${evaluatedStudentIdFromRow}, QID: ${questionIdFromRow}`);
         continue;
     }
 
     const evaluator = allStudentsFromMaster[evaluatorIdFromRow]; 
     if (!evaluator) {
-        // Logger.log(`parseRawSurveyData (V2) WARNING: Evaluator ID '${evaluatorIdFromRow}' from survey row ${i+1} not found in active master list. Skipping response.`);
         continue; 
     }
 
@@ -325,8 +290,7 @@ function parseRawSurveyData() {
 
     let evaluatedStudent = allStudentsFromMaster[evaluatedStudentIdFromRow]; 
     if (!evaluatedStudent) {
-        // Logger.log(`parseRawSurveyData (V2) INFO: Evaluated ID '${evaluatedStudentIdFromRow}' (Name from sheet: '${evaluatedStudentNameFromRow}') not in active master. Attempting to create/resolve as placeholder.`);
-        evaluatedStudent = createStudent({ // createStudent from Models.js
+        evaluatedStudent = createStudent({
             id: evaluatedStudentIdFromRow, 
             name: evaluatedStudentNameFromRow, 
             studentMasterListById: allStudentsFromMaster, 
@@ -337,12 +301,10 @@ function parseRawSurveyData() {
             Logger.log(`parseRawSurveyData (V2) WARNING: Failed to create/resolve placeholder for evaluated student ID '${evaluatedStudentIdFromRow}' from survey row ${i+1}. Skipping response.`);
             continue; 
         }
-        // Do not add to allStudentsFromMaster here to avoid modifying the collection while iterating indirectly
     }
     const finalEvaluatedStudentIdForResponse = evaluatedStudent.studentId; 
     
     if (!questionsFromConfig[questionIdFromRow]){ 
-        // Logger.log(`parseRawSurveyData (V2) WARNING: Skipping survey row ${i+1} - QID '${questionIdFromRow}' not in PaQuestionConfig.`); 
         continue; 
     }
     
@@ -350,12 +312,11 @@ function parseRawSurveyData() {
     if (responseTypeFromRow === "SCORE") {
         actualResponseValue = parseFloat(responseValueFromRow);
         if (isNaN(actualResponseValue)) { 
-            // Logger.log(`parseRawSurveyData (V2) WARNING: Score value '${responseValueFromRow}' for QID '${questionIdFromRow}' (Eval by: ${evaluatorIdFromRow}, Eval'd: ${finalEvaluatedStudentIdForResponse}) is not a number. Skipping response.`); 
             continue; 
         }
     }
 
-    const responseObj = createResponse( // createResponse from Models.js
+    const responseObj = createResponse(
             questionIdFromRow, actualResponseValue, finalEvaluatorEmailForResponse, 
             responseTypeFromRow, finalEvaluatedStudentIdForResponse, 
             timestampFromRow, unitContextFromRow
@@ -363,8 +324,6 @@ function parseRawSurveyData() {
 
     if (responseObj && responseObj.isValid()) { 
         responsesArray.push(responseObj); 
-    } else { 
-        // Logger.log(`parseRawSurveyData (V2) WARNING: Invalid response object created for QID '${questionIdFromRow}', Eval by '${finalEvaluatorEmailForResponse}'.`); 
     }
   } 
 

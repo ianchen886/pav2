@@ -1,7 +1,14 @@
+/* global isValidShuEmail, checkIfInstructor, PA_MASTER_STUDENT_LIST_SHEET_NAME, isValidProductionUnit */
+
 /**
- * @file EnhancedAuthHandler.js
+ * @file AuthHandler.js
  * @description Enhanced authentication system with improved session management
  * and role-based access control for the peer assessment system
+ * 
+ * @requires Config.js (must be loaded first - contains validation functions and constants)
+ * 
+ * IMPORTANT: This file does NOT need global declarations because Config.js 
+ * is loaded first and makes all validation functions available globally.
  */
 
 /**
@@ -21,11 +28,13 @@ function getCurrentUserSession() {
     Logger.log(`Authentication attempt for email: ${email}`);
     
     // Enhanced email validation for SHU domain
+    // isValidShuEmail is available from Config.js
     if (!isValidShuEmail(email)) {
       throw new Error(`Invalid email domain. Please use your SHU email address (format: x123456789@mail.shu.edu.tw). Current email: ${email}`);
     }
     
     // Check if user is an instructor
+    // checkIfInstructor is available from Config.js
     const isInstructor = checkIfInstructor(email);
     
     // If student, get their details from master list
@@ -50,17 +59,20 @@ function getCurrentUserSession() {
       }
     } else {
       Logger.log(`Instructor access granted for: ${email}`);
+      // Get all students for faculty
+      unitMembers = getAllActiveStudentsForFaculty();
     }
     
     return {
       email: email,
       isAuthenticated: true,
       role: isInstructor ? 'instructor' : 'student',
-      studentId: studentDetails ? studentDetails.studentId : null,
-      studentName: studentDetails ? studentDetails.studentName : null,
-      productionUnit: productionUnit,
+      studentId: studentDetails ? studentDetails.studentId : ('FACULTY_' + email.split('@')[0].toUpperCase()),
+      studentName: studentDetails ? studentDetails.studentName : 'Faculty Member',
+      productionUnit: productionUnit || 'FACULTY',
       unitMembers: unitMembers || [],
       timestamp: new Date().toISOString(),
+      isFaculty: isInstructor,
       sessionData: {
         totalPeersToEvaluate: unitMembers ? unitMembers.length : 0,
         hasValidUnit: !!productionUnit,
@@ -81,24 +93,6 @@ function getCurrentUserSession() {
 }
 
 /**
- * Enhanced instructor check with configurable instructor list
- * @param {string} email - Email address to check
- * @returns {boolean} True if instructor, false otherwise
- */
-function checkIfInstructor(email) {
-  const instructorEmails = [
-    'ichen@mail.shu.edu.tw',
-    // Add more instructor emails here as needed
-    // 'instructor2@mail.shu.edu.tw',
-    // 'admin@mail.shu.edu.tw'
-  ];
-  
-  const isInstructor = instructorEmails.includes(email.toLowerCase());
-  Logger.log(`Instructor check for ${email}: ${isInstructor}`);
-  return isInstructor;
-}
-
-/**
  * Enhanced student lookup with better error reporting
  * @param {string} email - Student email address
  * @returns {Object|null} Student object or null if not found
@@ -106,6 +100,7 @@ function checkIfInstructor(email) {
 function getStudentDetailsByEmail(email) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
+    // PA_MASTER_STUDENT_LIST_SHEET_NAME is available from Config.js
     const sheet = ss.getSheetByName(PA_MASTER_STUDENT_LIST_SHEET_NAME);
     
     if (!sheet) {
@@ -159,7 +154,7 @@ function getStudentDetailsByEmail(email) {
           unit2 = unit2.substring(5, 6);
         }
         
-        // Validate units
+        // Validate units - isValidProductionUnit is available from Config.js
         if (unit1 && !isValidProductionUnit(unit1)) {
           Logger.log(`Invalid unit1 format: ${unit1} for student ${email}`);
           unit1 = "";
@@ -213,12 +208,14 @@ function getStudentDetailsByEmail(email) {
  */
 function getUnitMembers(unit, currentStudentId) {
   try {
+    // isValidProductionUnit is available from Config.js
     if (!isValidProductionUnit(unit)) {
       Logger.log(`Invalid production unit: ${unit}`);
       return [];
     }
     
     const ss = SpreadsheetApp.getActiveSpreadsheet();
+    // PA_MASTER_STUDENT_LIST_SHEET_NAME is available from Config.js
     const sheet = ss.getSheetByName(PA_MASTER_STUDENT_LIST_SHEET_NAME);
     
     if (!sheet) {
@@ -293,284 +290,13 @@ function getUnitMembers(unit, currentStudentId) {
 }
 
 /**
- * Enhanced assessment permission validation with detailed logging
- * @param {string} evaluatorId - Student ID of evaluator
- * @param {string} evaluatedId - Student ID of student being evaluated
- * @returns {boolean} True if evaluation is allowed
- */
-function validateAssessmentPermission(evaluatorId, evaluatedId) {
-  try {
-    // Students cannot evaluate themselves
-    if (evaluatorId === evaluatedId) {
-      Logger.log(`Self-evaluation not allowed: ${evaluatorId}`);
-      return false;
-    }
-    
-    // Get both students' unit information
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(PA_MASTER_STUDENT_LIST_SHEET_NAME);
-    
-    if (!sheet) {
-      Logger.log("Master student list sheet not found for permission validation");
-      return false;
-    }
-    
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0].map(h => h ? h.toString().trim() : "");
-    
-    const idColIdx = headers.indexOf("studentId");
-    const unit1ColIdx = headers.indexOf("unit1");
-    const unit2ColIdx = headers.indexOf("unit2");
-    const statusColIdx = headers.indexOf("status");
-    
-    let evaluatorInfo = null;
-    let evaluatedInfo = null;
-    
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const studentId = row[idColIdx] ? row[idColIdx].toString().trim().toUpperCase() : null;
-      const status = row[statusColIdx] ? row[statusColIdx].toString().trim().toLowerCase() : "";
-      
-      // Only consider active students
-      if (status !== "active" && status !== "enrolled") continue;
-      
-      let unit1 = row[unit1ColIdx] ? row[unit1ColIdx].toString().trim().toUpperCase() : "";
-      let unit2 = row[unit2ColIdx] ? row[unit2ColIdx].toString().trim().toUpperCase() : "";
-      
-      // Clean unit formats
-      if (unit1.startsWith("UNIT ") && unit1.length > 5) {
-        unit1 = unit1.substring(5, 6);
-      }
-      if (unit2.startsWith("UNIT ") && unit2.length > 5) {
-        unit2 = unit2.substring(5, 6);
-      }
-      
-      if (studentId === evaluatorId) {
-        evaluatorInfo = { studentId, unit1, unit2, status };
-      }
-      if (studentId === evaluatedId) {
-        evaluatedInfo = { studentId, unit1, unit2, status };
-      }
-      
-      if (evaluatorInfo && evaluatedInfo) {
-        break;
-      }
-    }
-    
-    if (!evaluatorInfo) {
-      Logger.log(`Evaluator not found or inactive: ${evaluatorId}`);
-      return false;
-    }
-    
-    if (!evaluatedInfo) {
-      Logger.log(`Evaluated student not found or inactive: ${evaluatedId}`);
-      return false;
-    }
-    
-    // Check if students share at least one unit
-    const evaluatorUnits = [evaluatorInfo.unit1, evaluatorInfo.unit2].filter(u => u && isValidProductionUnit(u));
-    const evaluatedUnits = [evaluatedInfo.unit1, evaluatedInfo.unit2].filter(u => u && isValidProductionUnit(u));
-    
-    const sharedUnits = evaluatorUnits.filter(unit => evaluatedUnits.includes(unit));
-    
-    if (sharedUnits.length > 0) {
-      Logger.log(`Assessment permission granted: ${evaluatorId} can evaluate ${evaluatedId} (shared units: ${sharedUnits.join(', ')})`);
-      return true;
-    } else {
-      Logger.log(`Assessment permission denied: ${evaluatorId} and ${evaluatedId} do not share any units. Evaluator units: [${evaluatorUnits.join(', ')}], Evaluated units: [${evaluatedUnits.join(', ')}]`);
-      return false;
-    }
-    
-  } catch (error) {
-    Logger.log(`Error validating assessment permission: ${error.message}`);
-    return false;
-  }
-}
-
-/**
- * Enhanced user statistics with more detailed information
- * @returns {Object} Enhanced statistics object
- */
-function getUserStatistics() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const studentSheet = ss.getSheetByName(PA_MASTER_STUDENT_LIST_SHEET_NAME);
-    const submissionSheet = ss.getSheetByName(PA_RAW_SUBMISSIONS_V2_SHEET_NAME);
-    
-    let totalStudents = 0;
-    let activeStudents = 0;
-    let totalSubmissions = 0;
-    let unitCounts = {};
-    let statusCounts = {};
-    
-    // Count students by status and unit
-    if (studentSheet) {
-      const studentData = studentSheet.getDataRange().getValues();
-      if (studentData.length > 1) {
-        const headers = studentData[0].map(h => h ? h.toString().trim() : "");
-        const statusIdx = headers.indexOf("status");
-        const unitIdx = headers.indexOf("unit1");
-        
-        for (let i = 1; i < studentData.length; i++) {
-          const status = studentData[i][statusIdx] ? studentData[i][statusIdx].toString().toLowerCase() : "";
-          let unit = studentData[i][unitIdx] ? studentData[i][unitIdx].toString().trim().toUpperCase() : "";
-          
-          totalStudents++;
-          
-          // Count by status
-          statusCounts[status] = (statusCounts[status] || 0) + 1;
-          
-          if (status === "active" || status === "enrolled") {
-            activeStudents++;
-            
-            // Clean unit format
-            if (unit.startsWith("UNIT ") && unit.length > 5) {
-              unit = unit.substring(5, 6);
-            }
-            if (unit && isValidProductionUnit(unit)) {
-              unitCounts[unit] = (unitCounts[unit] || 0) + 1;
-            }
-          }
-        }
-      }
-    }
-    
-    // Count submissions with more detail
-    let submissionsByType = {};
-    let submissionsByUnit = {};
-    
-    if (submissionSheet) {
-      const submissionData = submissionSheet.getDataRange().getValues();
-      if (submissionData.length > 1) {
-        totalSubmissions = submissionData.length - 1; // Subtract header row
-        
-        const headers = submissionData[0].map(h => h ? h.toString().trim() : "");
-        const typeIdx = headers.indexOf("responseType");
-        const unitIdx = headers.indexOf("unitContextOfEvaluation");
-        
-        for (let i = 1; i < submissionData.length; i++) {
-          const type = submissionData[i][typeIdx] ? submissionData[i][typeIdx].toString() : "";
-          const unit = submissionData[i][unitIdx] ? submissionData[i][unitIdx].toString() : "";
-          
-          if (type) {
-            submissionsByType[type] = (submissionsByType[type] || 0) + 1;
-          }
-          if (unit) {
-            submissionsByUnit[unit] = (submissionsByUnit[unit] || 0) + 1;
-          }
-        }
-      }
-    }
-    
-    return {
-      totalStudents,
-      activeStudents,
-      totalSubmissions,
-      unitCounts,
-      statusCounts,
-      submissionsByType,
-      submissionsByUnit,
-      lastUpdated: new Date().toISOString(),
-      systemHealth: {
-        hasStudents: totalStudents > 0,
-        hasActiveStudents: activeStudents > 0,
-        hasSubmissions: totalSubmissions > 0,
-        unitsWithStudents: Object.keys(unitCounts).length
-      }
-    };
-    
-  } catch (error) {
-    Logger.log(`Error getting user statistics: ${error.message}`);
-    return {
-      totalStudents: 0,
-      activeStudents: 0,
-      totalSubmissions: 0,
-      unitCounts: {},
-      statusCounts: {},
-      submissionsByType: {},
-      submissionsByUnit: {},
-      error: error.message,
-      lastUpdated: new Date().toISOString()
-    };
-  }
-}
-
-/**
- * Wrapper function for web app compatibility
- * @returns {Object} Same as getCurrentUserSession()
- */
-function getCurrentUser() {
-  return getCurrentUserSession();
-}
-
-/**
- * Check system health and return status
- * @returns {Object} System health status
- */
-function getSystemHealth() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const requiredSheets = [
-      PA_MASTER_STUDENT_LIST_SHEET_NAME,
-      PA_QUESTION_CONFIG_SHEET_NAME,
-      PA_RAW_SUBMISSIONS_V2_SHEET_NAME
-    ];
-    
-    const health = {
-      timestamp: new Date().toISOString(),
-      status: 'healthy',
-      issues: [],
-      warnings: []
-    };
-    
-    // Check required sheets
-    requiredSheets.forEach(sheetName => {
-      const sheet = ss.getSheetByName(sheetName);
-      if (!sheet) {
-        health.issues.push(`Missing required sheet: ${sheetName}`);
-        health.status = 'error';
-      } else {
-        const rowCount = sheet.getLastRow();
-        if (rowCount <= 1) {
-          health.warnings.push(`Sheet "${sheetName}" appears to be empty (${rowCount} rows)`);
-          if (health.status === 'healthy') health.status = 'warning';
-        }
-      }
-    });
-    
-    // Get user statistics for additional health checks
-    const stats = getUserStatistics();
-    if (!stats.hasActiveStudents) {
-      health.warnings.push('No active students found in system');
-      if (health.status === 'healthy') health.status = 'warning';
-    }
-    
-    if (stats.unitsWithStudents === 0) {
-      health.warnings.push('No students assigned to production units');
-      if (health.status === 'healthy') health.status = 'warning';
-    }
-    
-    health.summary = `System ${health.status} - ${health.issues.length} issues, ${health.warnings.length} warnings`;
-    
-    return health;
-    
-  } catch (error) {
-    Logger.log(`Error checking system health: ${error.message}`);
-    return {
-      timestamp: new Date().toISOString(),
-      status: 'error',
-      issues: [`System health check failed: ${error.message}`],
-      warnings: [],
-      summary: 'System health check failed'
-    };
-  }
-}
-/**
- * Add this function to your AuthHandler.js to fix faculty access
+ * Get all active students for faculty access
+ * @returns {Array} Array of all active students
  */
 function getAllActiveStudentsForFaculty() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
+    // PA_MASTER_STUDENT_LIST_SHEET_NAME is available from Config.js
     const sheet = ss.getSheetByName(PA_MASTER_STUDENT_LIST_SHEET_NAME);
     
     if (!sheet) {
@@ -642,69 +368,109 @@ function getAllActiveStudentsForFaculty() {
 }
 
 /**
- * Update your getCurrentUserSession function to handle faculty properly
+ * Enhanced assessment permission validation with detailed logging
+ * @param {string} evaluatorId - Student ID of evaluator
+ * @param {string} evaluatedId - Student ID of student being evaluated
+ * @returns {boolean} True if evaluation is allowed
  */
-function getCurrentUserSession() {
+
+// eslint-disable-next-line no-unused-vars
+function validateAssessmentPermission(evaluatorId, evaluatedId) {
   try {
-    const user = Session.getActiveUser();
-    const email = user.getEmail();
-    
-    if (!email) {
-      throw new Error("No authenticated user found");
+    // Students cannot evaluate themselves
+    if (evaluatorId === evaluatedId) {
+      Logger.log(`Self-evaluation not allowed: ${evaluatorId}`);
+      return false;
     }
     
-    Logger.log(`Authentication attempt for email: ${email}`);
+    // Get both students' unit information
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    // PA_MASTER_STUDENT_LIST_SHEET_NAME is available from Config.js
+    const sheet = ss.getSheetByName(PA_MASTER_STUDENT_LIST_SHEET_NAME);
     
-    // Check if user is an instructor
-    const isInstructor = checkIfInstructor(email);
+    if (!sheet) {
+      Logger.log("Master student list sheet not found for permission validation");
+      return false;
+    }
     
-    if (isInstructor) {
-      // CREATE FACULTY SESSION WITH ALL STUDENTS
-      const allStudents = getAllActiveStudentsForFaculty();
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map(h => h ? h.toString().trim() : "");
+    
+    const idColIdx = headers.indexOf("studentId");
+    const unit1ColIdx = headers.indexOf("unit1");
+    const unit2ColIdx = headers.indexOf("unit2");
+    const statusColIdx = headers.indexOf("status");
+    
+    let evaluatorInfo = null;
+    let evaluatedInfo = null;
+    
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const studentId = row[idColIdx] ? row[idColIdx].toString().trim().toUpperCase() : null;
+      const status = row[statusColIdx] ? row[statusColIdx].toString().trim().toLowerCase() : "";
       
-      return {
-        email: email,
-        isAuthenticated: true,
-        role: 'instructor',
-        studentId: 'FACULTY_' + email.split('@')[0].toUpperCase(),
-        studentName: 'Faculty Member (' + email.split('@')[0].toUpperCase() + ')',
-        productionUnit: 'FACULTY',
-        unitMembers: allStudents, // Faculty can see all students
-        timestamp: new Date().toISOString(),
-        isFaculty: true
-      };
+      // Only consider active students
+      if (status !== "active" && status !== "enrolled") continue;
+      
+      let unit1 = row[unit1ColIdx] ? row[unit1ColIdx].toString().trim().toUpperCase() : "";
+      let unit2 = row[unit2ColIdx] ? row[unit2ColIdx].toString().trim().toUpperCase() : "";
+      
+      // Clean unit formats
+      if (unit1.startsWith("UNIT ") && unit1.length > 5) {
+        unit1 = unit1.substring(5, 6);
+      }
+      if (unit2.startsWith("UNIT ") && unit2.length > 5) {
+        unit2 = unit2.substring(5, 6);
+      }
+      
+      if (studentId === evaluatorId) {
+        evaluatorInfo = { studentId, unit1, unit2, status };
+      }
+      if (studentId === evaluatedId) {
+        evaluatedInfo = { studentId, unit1, unit2, status };
+      }
+      
+      if (evaluatorInfo && evaluatedInfo) {
+        break;
+      }
     }
     
-    // If student, get their details from master list
-    let studentDetails = getStudentDetailsByEmail(email);
-    if (!studentDetails) {
-      throw new Error("Student not found in master list or not active");
+    if (!evaluatorInfo) {
+      Logger.log(`Evaluator not found or inactive: ${evaluatorId}`);
+      return false;
     }
     
-    const productionUnit = studentDetails.productionUnit1;
-    let unitMembers = [];
-    
-    if (productionUnit) {
-      unitMembers = getUnitMembers(productionUnit, studentDetails.studentId);
+    if (!evaluatedInfo) {
+      Logger.log(`Evaluated student not found or inactive: ${evaluatedId}`);
+      return false;
     }
     
-    return {
-      email: email,
-      isAuthenticated: true,
-      role: 'student',
-      studentId: studentDetails.studentId,
-      studentName: studentDetails.studentName,
-      productionUnit: productionUnit,
-      unitMembers: unitMembers,
-      timestamp: new Date().toISOString()
-    };
+    // Check if students share at least one unit
+    // isValidProductionUnit is available from Config.js
+    const evaluatorUnits = [evaluatorInfo.unit1, evaluatorInfo.unit2].filter(u => u && isValidProductionUnit(u));
+    const evaluatedUnits = [evaluatedInfo.unit1, evaluatedInfo.unit2].filter(u => u && isValidProductionUnit(u));
+    
+    const sharedUnits = evaluatorUnits.filter(unit => evaluatedUnits.includes(unit));
+    
+    if (sharedUnits.length > 0) {
+      Logger.log(`Assessment permission granted: ${evaluatorId} can evaluate ${evaluatedId} (shared units: ${sharedUnits.join(', ')})`);
+      return true;
+    } else {
+      Logger.log(`Assessment permission denied: ${evaluatorId} and ${evaluatedId} do not share any units. Evaluator units: [${evaluatorUnits.join(', ')}], Evaluated units: [${evaluatedUnits.join(', ')}]`);
+      return false;
+    }
     
   } catch (error) {
-    Logger.log(`Authentication error: ${error.message}`);
-    return {
-      isAuthenticated: false,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    };
+    Logger.log(`Error validating assessment permission: ${error.message}`);
+    return false;
   }
+}
+
+/**
+ * Wrapper function for web app compatibility
+ * @returns {Object} Same as getCurrentUserSession()
+ */
+// eslint-disable-next-line no-unused-vars
+function getCurrentUser() {
+  return getCurrentUserSession();
 }

@@ -1,5 +1,4 @@
 /* global PA_REPORT_ALL_RESPONSES_SHEET_NAME, PA_REPORT_MISSING_ASSESSMENTS_SHEET_NAME, PA_VERIFICATION_MISSING_ASSESSMENTS_SHEET_NAME, parseRawSurveyData, generateEvaluatorAnalyticsAndWeights, isValidProductionUnit*/ 
-// Keep GAS services here for now for explicitness if preferred
 
 /**
  * @file Workflow_Reporting.js
@@ -14,8 +13,6 @@
  * @requires Utils.js (for isValidProductionUnit function)
  */
 
-// In Workflow_Reporting.gs // Your existing comment
-
 /**
  * Generates a detailed report of all individual raw responses submitted by students.
  * This report includes the timestamp, evaluated student details, question details,
@@ -28,7 +25,6 @@
  */
 // eslint-disable-next-line no-unused-vars
 function generateRawScoresReportWithWeights() {
-  const ui = SpreadsheetApp.getUi(); // Using const for consistency
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   Logger.clear();
   Logger.log("--- Starting Raw Scores Report Generation (camelCase Headers, with Weights, using V2 Parser) ---");
@@ -37,9 +33,9 @@ function generateRawScoresReportWithWeights() {
 
   const parsedData = parseRawSurveyData(); 
   if (!parsedData || !parsedData.students || !parsedData.responses || !parsedData.questions) {
-    ui.alert("Data Parsing Error", "Could not parse necessary data using V2 parser. Cannot generate raw scores report.", ui.ButtonSet.OK); 
-    Logger.log("ERROR: V2 Parser did not return expected data for raw scores report.");
-    return;
+    const errorMsg = "ERROR: V2 Parser did not return expected data for raw scores report.";
+    Logger.log(errorMsg);
+    throw new Error("Could not parse necessary data using V2 parser. Cannot generate raw scores report.");
   }
   const { students: allStudents, questions, responses } = parsedData;
   
@@ -51,13 +47,13 @@ function generateRawScoresReportWithWeights() {
   }
 
   if (responses.length === 0 && Object.keys(allStudents).length === 0){ 
-    ui.alert("No Data", "No students or responses found after V2 parsing. Raw scores report not generated.", ui.ButtonSet.OK); 
-    Logger.log("No student or response data available for raw scores report (V2 Parser).");
-    return;
+    const errorMsg = "No student or response data available for raw scores report (V2 Parser).";
+    Logger.log(errorMsg);
+    throw new Error("No students or responses found after V2 parsing. Raw scores report not generated.");
   }
   Logger.log(`Generating raw scores report from ${responses.length} responses (V2 Parser).`);
 
-  let reportSheet = ss.getSheetByName(reportSheetName); // Use let
+  let reportSheet = ss.getSheetByName(reportSheetName);
   if (reportSheet) {
     Logger.log(`Sheet "${reportSheetName}" found. Clearing all contents and formats.`);
     reportSheet.clearContents().clearFormats();
@@ -77,7 +73,7 @@ function generateRawScoresReportWithWeights() {
   reportSheet.setFrozenRows(1);
   Logger.log(`Populated camelCase headers in "${reportSheetName}".`);
 
-  const outputRows = []; // Use const
+  const outputRows = [];
   for (const response of responses) {
     const evaluatedStudentInfo = allStudents[response.evaluatedStudentId] || { studentName: `[Orphaned ID: ${response.evaluatedStudentId || 'N/A'}]` };
     const evaluatorStudentInfo = allStudents[response.responseByStudentId] || { studentName: `[Orphaned ID: ${response.responseByStudentId || 'N/A'}]` };
@@ -128,7 +124,7 @@ function generateRawScoresReportWithWeights() {
     
     try { reportSheet.autoResizeColumns(1, headers.length); } catch (e) { Logger.log(`Warning: autoResizeColumns failed. Error: ${e.message}`); }
     Logger.log(`Raw scores report (V2 Parser) generated in sheet "${reportSheetName}". ${outputRows.length} data rows written.`);
-    ui.alert("Report Generated", `Raw scores data (V2 Parser) written to sheet: "${reportSheetName}".`, ui.ButtonSet.OK);
+    Logger.log("SUCCESS: Raw scores data (V2 Parser) report generated successfully.");
   } else {
     reportSheet.getRange(2,1).setValue("No response data to display (V2 Parser).");
     Logger.log("No data rows to write to raw scores report (V2 Parser).");
@@ -136,7 +132,6 @@ function generateRawScoresReportWithWeights() {
   ss.setActiveSheet(reportSheet);
   Logger.log("--- Raw Scores Report (V2 Parser) Generation Complete ---");
 }
-
 
 /**
  * Identifies students who may not have completed all required evaluations for their peers
@@ -149,7 +144,6 @@ function generateRawScoresReportWithWeights() {
  */
 // eslint-disable-next-line no-unused-vars
 function findStudentsWhoHaventAssessedSpecificPeers() {
-  const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   Logger.clear(); 
   Logger.log("--- findStudentsWhoHaventAssessedSpecificPeers: Starting (camelCase Headers, V2 Parser) ---");
@@ -158,22 +152,22 @@ function findStudentsWhoHaventAssessedSpecificPeers() {
 
   const parsedData = parseRawSurveyData(); 
   if (!parsedData || !parsedData.students || !parsedData.responses) {
-    ui.alert("Data Parsing Error", "Could not parse necessary data using V2 parser. Cannot find missing assessments.", ui.ButtonSet.OK);
-    Logger.log("ERROR: V2 Parser did not return expected data (students/responses) for missing assessment check.");
-    return;
+    const errorMsg = "ERROR: V2 Parser did not return expected data (students/responses) for missing assessment check.";
+    Logger.log(errorMsg);
+    throw new Error("Could not parse necessary data using V2 parser. Cannot find missing assessments.");
   }
   const { students: allStudentsMaster, responses } = parsedData;
 
   if (Object.keys(allStudentsMaster).length === 0) { 
-    ui.alert("Data Error", "No valid student data parsed (V2 Parser). Cannot find missing assessments.", ui.ButtonSet.OK); 
-    Logger.log("ERROR: No students parsed by V2 parser for missing assessment check.");
-    return; 
+    const errorMsg = "ERROR: No students parsed by V2 parser for missing assessment check.";
+    Logger.log(errorMsg);
+    throw new Error("No valid student data parsed (V2 Parser). Cannot find missing assessments.");
   }
   Logger.log(`findStudentsWhoHaventAssessedSpecificPeers: Using ${Object.keys(allStudentsMaster).length} students from V2 parsed data.`);
 
-  const studentsByUnit = {}; // Changed: var to const. Will add units dynamically.
+  const studentsByUnit = {};
   for (const studentId in allStudentsMaster) {
-    if (Object.prototype.hasOwnProperty.call(allStudentsMaster, studentId)) { // Good practice
+    if (Object.prototype.hasOwnProperty.call(allStudentsMaster, studentId)) {
         const student = allStudentsMaster[studentId]; 
         if (student && student.productionUnit1 && isValidProductionUnit(student.productionUnit1)) {
           if (!studentsByUnit[student.productionUnit1]) studentsByUnit[student.productionUnit1] = []; 
@@ -189,7 +183,7 @@ function findStudentsWhoHaventAssessedSpecificPeers() {
   }
   Logger.log("findStudentsWhoHaventAssessedSpecificPeers: studentsByUnit populated.");
 
-  const assessmentsMade = {}; // Changed: var to const
+  const assessmentsMade = {};
   responses.forEach(response => {
     if (response.responseByStudentId && response.evaluatedStudentId) {
         const evaluatorId = response.responseByStudentId;
@@ -206,13 +200,13 @@ function findStudentsWhoHaventAssessedSpecificPeers() {
         }
         
         if (!assessmentsMade[evaluatorId]) assessmentsMade[evaluatorId] = {};
-        if (!assessmentsMade[evaluatorId][unitOfEvaluation]) assessmentsMade[evaluatorId][unitOfEvaluation] = new Set(); // Set is a built-in JS global
+        if (!assessmentsMade[evaluatorId][unitOfEvaluation]) assessmentsMade[evaluatorId][unitOfEvaluation] = new Set();
         assessmentsMade[evaluatorId][unitOfEvaluation].add(evaluatedId);
     }
   });
   Logger.log("findStudentsWhoHaventAssessedSpecificPeers: assessmentsMade structure built.");
   
-  let reportSheet = ss.getSheetByName(reportSheetName); // Changed: var to let
+  let reportSheet = ss.getSheetByName(reportSheetName);
   if (reportSheet) {
     Logger.log(`Sheet "${reportSheetName}" found. Clearing all contents and formats.`);
     reportSheet.clearContents().clearFormats();
@@ -235,7 +229,7 @@ function findStudentsWhoHaventAssessedSpecificPeers() {
   let foundAnyMissing = false;
 
   for (const evaluatorId in allStudentsMaster) { 
-    if (Object.prototype.hasOwnProperty.call(allStudentsMaster, evaluatorId) && !evaluatorId.startsWith("UNKNOWNID_")) { // Good practice and ignore UNKNOWNID as evaluators
+    if (Object.prototype.hasOwnProperty.call(allStudentsMaster, evaluatorId) && !evaluatorId.startsWith("UNKNOWNID_")) {
         const evaluator = allStudentsMaster[evaluatorId]; 
         
         const unitsEvaluatorBelongsTo = [];
@@ -296,15 +290,14 @@ function findStudentsWhoHaventAssessedSpecificPeers() {
         }
     });
     try { reportSheet.autoResizeColumns(1, reportHeaders.length); } catch (e) { Logger.log(`Warning: autoResizeColumns failed. Error: ${e.message}`); }
-    ui.alert("Report Generated", `Detailed missing assessments report (V2 Parser) generated in sheet: "${reportSheetName}".`, ui.ButtonSet.OK);
+    Logger.log("SUCCESS: Detailed missing assessments report (V2 Parser) generated successfully.");
   } else {
     reportSheet.getRange(2,1).setValue("All students appear to have assessed all their required peers based on their assigned unit(s) and available responses (V2 Parser).");
-    ui.alert("All Clear", "No missing assessments found (V2 Parser).", ui.ButtonSet.OK);
+    Logger.log("INFO: No missing assessments found (V2 Parser).");
   }
   ss.setActiveSheet(reportSheet);
   Logger.log("--- Detailed Missing Assessments Generation Complete (V2 Parser) ---");
 }
-
 
 /**
  * Verifies the accuracy of the 'Detailed Missing Assessments' report by re-analyzing
@@ -317,7 +310,6 @@ function findStudentsWhoHaventAssessedSpecificPeers() {
  */
 // eslint-disable-next-line no-unused-vars
 function verifyMissingAssessmentsReport() {
-  const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   Logger.clear();
   Logger.log("--- Starting Verification of Missing Assessments Report (camelCase Headers, V2 Parser) ---");
@@ -327,19 +319,19 @@ function verifyMissingAssessmentsReport() {
 
   const parsedData = parseRawSurveyData(); 
   if (!parsedData || !parsedData.students || !parsedData.responses) {
-    ui.alert("Data Parsing Error", "Could not parse data (V2 Parser). Cannot verify missing assessments report.", ui.ButtonSet.OK);
-    Logger.log("ERROR: V2 Parser did not return expected data for verification.");
-    return;
+    const errorMsg = "ERROR: V2 Parser did not return expected data for verification.";
+    Logger.log(errorMsg);
+    throw new Error("Could not parse data (V2 Parser). Cannot verify missing assessments report.");
   }
   const { students: allStudentsMaster, responses } = parsedData;
   if (Object.keys(allStudentsMaster).length === 0) {
-    ui.alert("Data Error", "No student data parsed (V2 Parser). Cannot verify.", ui.ButtonSet.OK);
-    Logger.log("ERROR: No students from V2 Parser for verification.");
-    return;
+    const errorMsg = "ERROR: No students from V2 Parser for verification.";
+    Logger.log(errorMsg);
+    throw new Error("No student data parsed (V2 Parser). Cannot verify.");
   }
   Logger.log("Verification: Using V2 parsed data for current assessment state.");
 
-  const assessmentsMade = {}; // Changed: var to const
+  const assessmentsMade = {};
   responses.forEach(response => {
     if (response.responseByStudentId && response.evaluatedStudentId) {
         const evaluatorId = response.responseByStudentId;
@@ -356,23 +348,23 @@ function verifyMissingAssessmentsReport() {
         }
         
         if (!assessmentsMade[evaluatorId]) assessmentsMade[evaluatorId] = {};
-        if (!assessmentsMade[evaluatorId][unitOfEvaluation]) assessmentsMade[evaluatorId][unitOfEvaluation] = new Set(); // Set is built-in
+        if (!assessmentsMade[evaluatorId][unitOfEvaluation]) assessmentsMade[evaluatorId][unitOfEvaluation] = new Set();
         assessmentsMade[evaluatorId][unitOfEvaluation].add(evaluatedId);
     }
   });
   Logger.log("Verification: Re-built assessmentsMade structure from V2 data.");
 
-  let generatedReportSheet = ss.getSheetByName(generatedReportSheetName); // Changed: var to let
+  let generatedReportSheet = ss.getSheetByName(generatedReportSheetName);
   if (!generatedReportSheet) {
-    ui.alert("Report Not Found", `The report sheet "${generatedReportSheetName}" to verify was not found. Please generate it first.`, ui.ButtonSet.OK);
-    Logger.log(`ERROR: Report sheet "${generatedReportSheetName}" not found for verification.`);
-    return;
+    const errorMsg = `ERROR: Report sheet "${generatedReportSheetName}" not found for verification.`;
+    Logger.log(errorMsg);
+    throw new Error(`The report sheet "${generatedReportSheetName}" to verify was not found. Please generate it first.`);
   }
-  const reportContent = generatedReportSheet.getDataRange().getValues(); // Changed: var to const
+  const reportContent = generatedReportSheet.getDataRange().getValues();
   if (reportContent.length < 1) { 
-    ui.alert("Report Empty", `The report sheet "${generatedReportSheetName}" is empty or has no headers. Nothing to verify.`, ui.ButtonSet.OK);
-    Logger.log(`INFO: Report sheet "${generatedReportSheetName}" is empty. Nothing to verify.`);
-    return;
+    const errorMsg = `INFO: Report sheet "${generatedReportSheetName}" is empty. Nothing to verify.`;
+    Logger.log(errorMsg);
+    throw new Error(`The report sheet "${generatedReportSheetName}" is empty or has no headers. Nothing to verify.`);
   }
   
   const reportActualHeaders = reportContent[0].map(h => h ? h.toString().trim() : "");
@@ -386,9 +378,9 @@ function verifyMissingAssessmentsReport() {
           (repEvalUnitColIdx === -1 ? "evaluatorUnitContext" : null),
           (repPeerNotAssessedIdColIdx === -1 ? "peerNotAssessedId" : null)
       ].filter(Boolean).join(", ");
-      ui.alert("Report Format Error", `One or more expected camelCase headers (${missingHeaders}) not found in "${generatedReportSheetName}". Cannot verify. Found: ${reportActualHeaders.join(', ')}`, ui.ButtonSet.OK);
-      Logger.log(`ERROR: Missing critical headers in report sheet "${generatedReportSheetName}". Needed: evaluatorId, evaluatorUnitContext, peerNotAssessedId.`);
-      return;
+      const errorMsg = `ERROR: Missing critical headers in report sheet "${generatedReportSheetName}". Needed: evaluatorId, evaluatorUnitContext, peerNotAssessedId.`;
+      Logger.log(errorMsg);
+      throw new Error(`One or more expected camelCase headers (${missingHeaders}) not found in "${generatedReportSheetName}". Cannot verify. Found: ${reportActualHeaders.join(', ')}`);
   }
 
   let verificationResults = []; 
@@ -444,7 +436,7 @@ function verifyMissingAssessmentsReport() {
     }
   }
 
-  let summarySheet = ss.getSheetByName(verificationSummarySheetName); // Changed: var to let
+  let summarySheet = ss.getSheetByName(verificationSummarySheetName);
   if (summarySheet) { 
     summarySheet.clearContents().clearFormats(); 
     Logger.log(`Sheet "${verificationSummarySheetName}" found and cleared.`);
@@ -493,7 +485,7 @@ function verifyMissingAssessmentsReport() {
   }
   
   Logger.log(`Verification Complete. Summary written to "${verificationSummarySheetName}". Discrepancies: ${discrepanciesFound}.`);
-  ui.alert("Verification Complete", `Summary written to sheet: "${verificationSummarySheetName}". Discrepancies found: ${discrepanciesFound}. (V2 Parser context)`, ui.ButtonSet.OK);
+  Logger.log(`SUCCESS: Verification complete. Summary written to sheet: "${verificationSummarySheetName}". Discrepancies found: ${discrepanciesFound}. (V2 Parser context)`);
   ss.setActiveSheet(summarySheet);
   Logger.log("--- Verification of Missing Assessments Report Complete (V2 Parser) ---");
 }

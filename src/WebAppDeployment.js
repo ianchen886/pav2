@@ -1,4 +1,4 @@
-/* global PA_MASTER_STUDENT_LIST_SHEET_NAME, PA_QUESTION_CONFIG_SHEET_NAME, PA_RAW_SUBMISSIONS_V2_SHEET_NAME, parseRawSurveyData, getQuestionDefinitions, submitPeerAssessments, generateEvaluatorAnalyticsAndWeights, calculateWeightedScoresAndUpdateSheet, generateRawScoresReportWithWeights, findStudentsWhoHaventAssessedSpecificPeers, createStudent, createQuestion, isValidShuEmail, extractStudentIdFromEmail, isValidProductionUnit */
+/* global PA_MASTER_STUDENT_LIST_SHEET_NAME, PA_QUESTION_CONFIG_SHEET_NAME, PA_RAW_SUBMISSIONS_V2_SHEET_NAME, parseRawSurveyData, isValidProductionUnit, getCurrentUserSession, getQuestionDefinitions, submitPeerAssessments */
 
 /**
  * @file WebAppDeployment.js
@@ -36,6 +36,14 @@ function doGet(e) {
 }
 
 /**
+ * Handle POST requests (redirect to GET)
+ */
+// eslint-disable-next-line no-unused-vars
+function doPost(e) {
+  return doGet(e);
+}
+
+/**
  * Main interface that checks authentication and routes appropriately
  */
 function createMainInterface() {
@@ -58,72 +66,12 @@ function createMainInterface() {
   }
 }
 
-
-/**
- * Get current user session information
- * This is the main function called by the frontend AssessmentInterface.html
- */
-function getCurrentUserSession() {
-  Logger.log('getCurrentUserSession called');
-  
-  try {
-    // Get the current user's email
-    const userEmail = Session.getActiveUser().getEmail();
-    Logger.log('Current user email: ' + userEmail);
-    
-    if (!userEmail) {
-      throw new Error('No authenticated user found');
-    }
-    
-    // Validate that it's a valid SHU email
-    if (!isValidShuEmail(userEmail)) {
-      throw new Error('Access denied. Please use your SHU student email account.');
-    }
-    
-    // Extract student ID from email
-    const studentId = extractStudentIdFromEmail(userEmail);
-    if (!studentId) {
-      throw new Error('Could not extract student ID from email');
-    }
-    
-    // Get student information from master list
-    const studentInfo = getStudentFromMasterList(studentId);
-    if (!studentInfo) {
-      throw new Error('Student not found in master list. Please contact your instructor.');
-    }
-    
-    // Get unit members for peer assessment
-    const unitMembers = getUnitMembers(studentInfo);
-    
-    // Prepare session object
-    const session = {
-      isAuthenticated: true,
-      studentId: studentInfo.studentId,
-      studentName: studentInfo.studentName,
-      email: userEmail,
-      productionUnit: studentInfo.productionUnit1,
-      unitMembers: unitMembers,
-      timestamp: new Date().toISOString(),
-      role: 'student' // Default role, can be enhanced later
-    };
-    
-    Logger.log('Session created successfully for: ' + studentId);
-    return session;
-    
-  } catch (error) {
-    Logger.log('Error in getCurrentUserSession: ' + error.toString());
-    return {
-      isAuthenticated: false,
-      error: error.toString(),
-      timestamp: new Date().toISOString()
-    };
-  }
-}
-
 /**
  * Updated getStudentFromMasterList to handle faculty lookups
  * Replace the existing function in your WebAppDeployment.js
  */
+
+// eslint-disable-next-line no-unused-vars
 function getStudentFromMasterList(userId) {
   Logger.log('Looking up user: ' + userId);
   
@@ -225,6 +173,8 @@ function getStudentFromMasterList(userId) {
  * Updated getUnitMembers to handle faculty access
  * Replace the existing function in your WebAppDeployment.js
  */
+
+// eslint-disable-next-line no-unused-vars
 function getUnitMembers(userInfo) {
   Logger.log('Getting unit members for: ' + userInfo.studentId);
   
@@ -439,7 +389,7 @@ function createInstructorDashboard(userSession) {
               google.script.run
                 .withSuccessHandler(resolve)
                 .withFailureHandler(reject)
-                .getSystemStatistics();
+                .getSystemStatisticsSafe();
             });
             updateStats(stats);
           } catch (error) {
@@ -721,13 +671,23 @@ function createInstructorInterface() {
 // ===== API ENDPOINTS FOR FRONTEND =====
 
 /**
- * API endpoint to get system statistics for instructor dashboard
+ * API endpoint to get system statistics for instructor dashboard (SAFE VERSION)
  */
-function getSystemStatistics() {
+// eslint-disable-next-line no-unused-vars
+function getSystemStatisticsSafe() {
   try {
+    Logger.log('getSystemStatisticsSafe called from WebAppDeployment');
+    
     const parsedData = parseRawSurveyData();
     if (!parsedData) {
-      return { error: 'Failed to parse data' };
+      Logger.log('parseRawSurveyData returned null');
+      return { 
+        totalStudents: 0, 
+        totalQuestions: 0, 
+        totalResponses: 0,
+        completionRate: 0,
+        error: 'Failed to parse data' 
+      };
     }
     
     const totalStudents = Object.keys(parsedData.students).length;
@@ -738,6 +698,8 @@ function getSystemStatistics() {
     const expectedResponses = totalStudents * totalQuestions * (totalStudents - 1);
     const completionRate = expectedResponses > 0 ? Math.round((totalResponses / expectedResponses) * 100) : 0;
     
+    Logger.log(`System stats: ${totalStudents} students, ${totalQuestions} questions, ${totalResponses} responses, ${completionRate}% complete`);
+    
     return {
       totalStudents,
       totalQuestions,
@@ -746,14 +708,23 @@ function getSystemStatistics() {
     };
     
   } catch (error) {
-    Logger.log(`Error getting system statistics: ${error.message}`);
-    return { error: error.message };
+    Logger.log(`Error in getSystemStatisticsSafe: ${error.message}`);
+    Logger.log(`Error stack: ${error.stack}`);
+    return { 
+      totalStudents: 0, 
+      totalQuestions: 0, 
+      totalResponses: 0,
+      completionRate: 0,
+      error: error.message 
+    };
   }
 }
 
 /**
  * API endpoint to get quick reports HTML
  */
+
+// eslint-disable-next-line no-unused-vars
 function getQuickReports() {
   try {
     const parsedData = parseRawSurveyData();
@@ -795,6 +766,8 @@ function getQuickReports() {
 /**
  * API endpoint to get system status
  */
+
+// eslint-disable-next-line no-unused-vars
 function getSystemStatus() {
   const status = {};
   
@@ -852,6 +825,8 @@ function getSystemStatus() {
 /**
  * Include HTML files for templating (if using separate HTML files)
  */
+
+// eslint-disable-next-line no-unused-vars
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
@@ -862,6 +837,8 @@ function include(filename) {
  * Wrapper function for getQuestionDefinitions to be called by frontend
  * This ensures compatibility with the existing AssessmentInterface.html
  */
+
+// eslint-disable-next-line no-unused-vars
 function getQuestionDefinitionsForFrontend() {
   try {
     return getQuestionDefinitions();
@@ -875,8 +852,9 @@ function getQuestionDefinitionsForFrontend() {
  * Submit peer assessments from the frontend
  * This function receives the assessment data and processes it
  */
-function submitPeerAssessmentsFromFrontend(submissions) {
-  Logger.log('submitPeerAssessmentsFromFrontend called with ' + submissions.length + ' submissions');
+
+function handleAssessmentSubmission(e) {
+  Logger.log('handleAssessmentSubmission called with ' + JSON.stringify(e.parameter));
   
   try {
     // Validate user session first
@@ -885,28 +863,49 @@ function submitPeerAssessmentsFromFrontend(submissions) {
       throw new Error('User not authenticated');
     }
     
+    // Process the submission data
+    const submissionData = JSON.parse(e.parameter.submissions || '[]');
+    
     // Validate submissions array
-    if (!Array.isArray(submissions) || submissions.length === 0) {
+    if (!Array.isArray(submissionData) || submissionData.length === 0) {
       throw new Error('No submissions provided');
     }
     
     // Validate that all submissions are from the current user
     const currentUserId = userSession.studentId;
-    for (const submission of submissions) {
+    for (const submission of submissionData) {
       if (submission.evaluatorId !== currentUserId) {
         throw new Error('Submission contains evaluations from a different user');
       }
     }
     
     // Call the existing submitPeerAssessments function
-    return submitPeerAssessments(submissions);
+    const result = submitPeerAssessments(submissionData);
+    
+    if (result.success) {
+      return HtmlService.createHtmlOutput(`
+        <script>
+          alert('✅ Assessments submitted successfully!');
+          window.location.href = '?';
+        </script>
+      `);
+    } else {
+      return HtmlService.createHtmlOutput(`
+        <script>
+          alert('❌ Submission failed: ${result.error}');
+          history.back();
+        </script>
+      `);
+    }
     
   } catch (error) {
-    Logger.log('Error in submitPeerAssessmentsFromFrontend: ' + error.toString());
-    return {
-      success: false,
-      error: error.toString()
-    };
+    Logger.log('Error in handleAssessmentSubmission: ' + error.toString());
+    return HtmlService.createHtmlOutput(`
+      <script>
+        alert('❌ Submission failed: ${error.toString()}');
+        history.back();
+      </script>
+    `);
   }
 }
 
@@ -914,6 +913,8 @@ function submitPeerAssessmentsFromFrontend(submissions) {
  * Alternative function name for backward compatibility
  * This ensures the frontend can call either function name
  */
+
+// eslint-disable-next-line no-unused-vars
 function submitAssessmentsToBackend(submissions) {
-  return submitPeerAssessmentsFromFrontend(submissions);
+  return handleAssessmentSubmission({ parameter: { submissions: JSON.stringify(submissions) } });
 }

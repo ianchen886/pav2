@@ -1,3 +1,5 @@
+/* global PA_RAW_SUBMISSIONS_V2_SHEET_NAME, isValidShuEmail, isValidProductionUnit, validateAssessmentPermission */
+
 /**
  * @file SubmissionHandler.js
  * @description Enhanced submission handler for the improved assessment interface
@@ -9,6 +11,9 @@
  * @param {Array} submissions - Array of submission objects from the frontend
  * @returns {Object} Result object with success status and detailed information
  */
+
+
+// eslint-disable-next-line no-unused-vars 
 function submitPeerAssessments(submissions) {
   try {
     Logger.log(`Received ${submissions.length} assessment submissions for processing`);
@@ -38,7 +43,7 @@ function submitPeerAssessments(submissions) {
     // Validate and process submissions
     const validatedSubmissions = [];
     const errors = [];
-    const submissionGroups = groupSubmissionsByEvaluatedStudent(submissions);
+    // const submissionGroups = groupSubmissionsByEvaluatedStudent(submissions);
     
     submissions.forEach((submission, index) => {
       try {
@@ -94,7 +99,7 @@ function submitPeerAssessments(submissions) {
     }
     
     // Generate detailed submission summary
-    const submissionSummary = generateDetailedSubmissionSummary(validatedSubmissions, submissionGroups);
+    const submissionSummary = generateDetailedSubmissionSummary(validatedSubmissions);
     Logger.log(`Submission Summary: ${JSON.stringify(submissionSummary)}`);
     
     return {
@@ -119,6 +124,8 @@ function submitPeerAssessments(submissions) {
  * @param {Array} submissions - Array of submission objects
  * @returns {Object} Object with evaluated student IDs as keys
  */
+
+// eslint-disable-next-line no-unused-vars
 function groupSubmissionsByEvaluatedStudent(submissions) {
   const groups = {};
   
@@ -287,7 +294,7 @@ function removeDuplicateSubmissions(sheet, toRemove) {
  * @param {Object} submissionGroups - Grouped submissions by evaluated student
  * @returns {Object} Detailed summary object
  */
-function generateDetailedSubmissionSummary(submissions, submissionGroups) {
+function generateDetailedSubmissionSummary(submissions) {
   const summary = {
     totalSubmissions: submissions.length,
     scoreSubmissions: 0,
@@ -412,6 +419,8 @@ function getExistingSubmissions(sheet) {
  * @param {string} evaluatorId - Student ID of evaluator
  * @returns {Object} Completion status object
  */
+
+// eslint-disable-next-line no-unused-vars 
 function getAssessmentCompletionStatus(evaluatorId) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();

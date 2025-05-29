@@ -1,5 +1,7 @@
+/* global getCurrentUserSession, parseRawSurveyData, PA_QUESTION_CONFIG_SHEET_NAME */
+
 /**
- * @file WebAppAPI.js
+ * @file WebAPI.js
  * @description Unified Web Application API - CORRECTED VERSION
  * All function calls have been standardized to use getCurrentUserSession()
  */
@@ -11,12 +13,13 @@
 /**
  * Main web app entry point for GET requests
  */
+// eslint-disable-next-line no-unused-vars
 function doGet(e) {
   try {
     Logger.log('Web app accessed');
     
     // Get current user to determine interface type
-    const userSession = getCurrentUserSession(); // FIXED: Use correct function name
+    const userSession = getCurrentUserSession();
     
     if (!userSession.isAuthenticated) {
       return createAuthenticationInterface(userSession.error);
@@ -40,6 +43,7 @@ function doGet(e) {
 /**
  * Handle POST requests (redirect to GET)
  */
+// eslint-disable-next-line no-unused-vars
 function doPost(e) {
   return doGet(e);
 }
@@ -53,15 +57,17 @@ function doPost(e) {
  * Get current user session (for frontend compatibility)
  * This matches what the HTML expects to call
  */
+// eslint-disable-next-line no-unused-vars
 function getCurrentUser() {
-  return getCurrentUserSession(); // FIXED: Delegate to the correct function
+  return getCurrentUserSession();
 }
 
 /**
  * Get question definitions for the web interface
  * Uses your existing parser logic
  */
-function getQuestionDefinitions() {
+// eslint-disable-next-line no-unused-vars
+function getQuestionDefinitionsForWeb() {
   try {
     // Use existing function from Parser_V2.js logic
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -111,7 +117,7 @@ function getQuestionDefinitions() {
     return questionsMap;
     
   } catch (error) {
-    Logger.log(`Error in getQuestionDefinitions: ${error.message}`);
+    Logger.log(`Error in getQuestionDefinitionsForWeb: ${error.message}`);
     throw new Error(`Failed to load questions: ${error.message}`);
   }
 }
@@ -295,7 +301,7 @@ function createInstructorInterface(userSession) {
               google.script.run
                 .withSuccessHandler(resolve)
                 .withFailureHandler(reject)
-                .getSystemStatistics();
+                .getSystemStatisticsSafe();
             });
             
             document.getElementById('totalStudents').textContent = stats.totalStudents || '0';
@@ -517,12 +523,16 @@ function createErrorInterface(errorMessage) {
 // ==============================================
 
 /**
- * Get system statistics for the instructor dashboard
+ * Get system statistics for the instructor dashboard (SAFE VERSION)
  */
-function getSystemStatistics() {
+// eslint-disable-next-line no-unused-vars
+function getSystemStatisticsSafe() {
   try {
+    Logger.log('getSystemStatisticsSafe called');
+    
     const parsedData = parseRawSurveyData();
     if (!parsedData) {
+      Logger.log('parseRawSurveyData returned null');
       return { 
         totalStudents: 0, 
         totalResponses: 0, 
@@ -535,6 +545,8 @@ function getSystemStatistics() {
     const totalQuestions = Object.keys(parsedData.questions).length;
     const totalResponses = parsedData.responses.length;
     
+    Logger.log(`Statistics: ${totalStudents} students, ${totalQuestions} questions, ${totalResponses} responses`);
+    
     return {
       totalStudents,
       totalQuestions,
@@ -542,7 +554,8 @@ function getSystemStatistics() {
     };
     
   } catch (error) {
-    Logger.log(`Error getting system statistics: ${error.message}`);
+    Logger.log(`Error in getSystemStatisticsSafe: ${error.message}`);
+    Logger.log(`Error stack: ${error.stack}`);
     return { 
       totalStudents: 0, 
       totalResponses: 0, 

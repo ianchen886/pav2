@@ -15,8 +15,6 @@
  * @requires Utils.js (for calculateMedianFromArray, calculateMean, calculateStdDev functions)
  */
 
-// In Workflow_Analytics.js // Your existing comment
-
 /**
  * Generates detailed analytics for each evaluator based on their submitted peer assessments
  * and calculates a "weight" for each evaluator.
@@ -33,7 +31,7 @@
  *    based on these metrics, aiming to adjust for potential biases or rating styles.
  * 7. Outputting all calculated analytics and weights to the 'PaEvaluatorAnalytics' sheet.
  *
- * This function is typically called from a custom menu item.
+ * This function is web-safe and can be called from both menu items and web interfaces.
  *
  * @function generateEvaluatorAnalyticsAndWeights
  * @returns {Object<string, number>|null} An object where keys are evaluator student IDs and values
@@ -42,36 +40,32 @@
  */
 // eslint-disable-next-line no-unused-vars
 function generateEvaluatorAnalyticsAndWeights() {
-  const ui = SpreadsheetApp.getUi(); // SpreadsheetApp, Ui are from eslint.config.mjs
+  // ✅ REMOVED: const ui = SpreadsheetApp.getUi(); - This was causing the web context error
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  Logger.clear(); // Logger is from eslint.config.mjs
-  Logger.log("--- Starting Evaluator Analytics & Weight Generation (camelCase Headers) ---");
+  Logger.clear();
+  Logger.log("--- Starting Evaluator Analytics & Weight Generation (Web-Safe Version) ---");
 
   const analyticsSheetName = PA_EVALUATOR_ANALYTICS_SHEET_NAME; 
 
   const parsedData = parseRawSurveyData(); 
   if (!parsedData || !parsedData.students || !parsedData.responses || !parsedData.questions ) {
-    ui.alert("Data Parsing Error", "Could not parse necessary data. Cannot generate analytics.", ui.ButtonSet.OK);
+    // ✅ FIXED: Replaced ui.alert() with Logger.log() and throw error for web interface to handle
     Logger.log("ERROR: parseRawSurveyData did not return expected data for analytics.");
-    return null; 
+    throw new Error("Could not parse necessary data. Cannot generate analytics.");
   }
-  // In a real project, you might destructure with more specific JSDoc types if defined
-  // /** @type {Object<string, Student>} */ const allStudents = parsedData.students; 
-  // /** @type {Object<string, Question>} */ const questions = parsedData.questions;
-  // /** @type {Response[]} */ const responses = parsedData.responses;
-  const { students: allStudents, questions: _questions, responses } = parsedData; // _questions to avoid no-unused-vars if not directly used after destructuring
-  // If 'questions' from parsedData is truly not used in this function, consider removing it from destructuring or prefixing with _
+
+  const { students: allStudents, questions: _questions, responses } = parsedData;
 
   Logger.log(`Analytics - Parsed Students Count: ${Object.keys(allStudents).length}`);
-  // Logger.log(`Analytics - Parsed Questions Count: ${Object.keys(_questions).length}`); // Using _questions
   Logger.log(`Analytics - Parsed Responses Count: ${responses.length}`);
 
   if (Object.keys(allStudents).length === 0 ) {
-      ui.alert("No Data", "No student data found for analytics.", ui.ButtonSet.OK);
-      return null; 
+    // ✅ FIXED: Replaced ui.alert() with Logger.log() and throw error
+    Logger.log("ERROR: No student data found for analytics.");
+    throw new Error("No student data found for analytics.");
   }
 
-  let reportSheet = ss.getSheetByName(analyticsSheetName); // Changed: var to let
+  let reportSheet = ss.getSheetByName(analyticsSheetName);
   if (reportSheet) { 
     reportSheet.clearContents().clearFormats(); 
   } else { 
@@ -93,15 +87,14 @@ function generateEvaluatorAnalyticsAndWeights() {
 
   let evaluatorMetrics = {}; 
   for (const studentId in allStudents) {
-    // It's good practice to check hasOwnProperty when iterating with for...in, though for objects created by Object.keys/map it's usually fine.
     if (Object.prototype.hasOwnProperty.call(allStudents, studentId) && allStudents[studentId] && 
         !studentId.startsWith("UNKNOWNID_") && /^[A-Z]{1}[0-9]{9}$/.test(studentId)) {
       evaluatorMetrics[studentId] = {
-        studentId: studentId, // This is studentObject.studentId from the parsed data
+        studentId: studentId,
         studentName: allStudents[studentId].studentName || `[Name missing for ${studentId}]`, 
         scoresGivenValues: [], commentsMadeCount: 0, assessmentsWhereCommentProvided: 0, 
         totalScoredAssessments: 0, commentLengths: [],
-        distinctScoreValuesUsed: new Set(), // Set is a built-in JS global
+        distinctScoreValuesUsed: new Set(),
         absDeviationsFromGroupMedianArray: [] 
       };
     }
@@ -114,7 +107,6 @@ function generateEvaluatorAnalyticsAndWeights() {
       return; 
     }
     const evaluatorId = response.responseByStudentId;
-    // Ensure evaluatedStudentId and responseToQuestionId are present to form a valid key
     if (!response.evaluatedStudentId || !response.responseToQuestionId) return; 
     const evalKey = `${evaluatorId}_${response.evaluatedStudentId}_${response.responseToQuestionId}`;
 
@@ -124,7 +116,7 @@ function generateEvaluatorAnalyticsAndWeights() {
       evaluatorMetrics[evaluatorId].distinctScoreValuesUsed.add(response.responseValue);
       if (!scoreCommentPairTracker[evalKey]) scoreCommentPairTracker[evalKey] = { hasScore: false, hasComment: false };
       scoreCommentPairTracker[evalKey].hasScore = true;
-    } else if (response.responseType === "COMMENT" && typeof response.responseValue === 'string' && response.responseValue.trim() !== "") { // Ensure comment has content
+    } else if (response.responseType === "COMMENT" && typeof response.responseValue === 'string' && response.responseValue.trim() !== "") {
       evaluatorMetrics[evaluatorId].commentsMadeCount++;
       evaluatorMetrics[evaluatorId].commentLengths.push(response.responseValue.trim().length);
       if (!scoreCommentPairTracker[evalKey]) scoreCommentPairTracker[evalKey] = { hasScore: false, hasComment: false };
@@ -133,7 +125,7 @@ function generateEvaluatorAnalyticsAndWeights() {
   });
 
   for (const key in scoreCommentPairTracker) {
-    if (Object.prototype.hasOwnProperty.call(scoreCommentPairTracker, key)) { // Good practice for for...in
+    if (Object.prototype.hasOwnProperty.call(scoreCommentPairTracker, key)) {
       const parts = key.split('_');
       const evaluatorId = parts[0];
       if (!evaluatorMetrics[evaluatorId]) continue; 
@@ -152,25 +144,21 @@ function generateEvaluatorAnalyticsAndWeights() {
           const itemKey = `${r1.evaluatedStudentId}_${r1.responseToQuestionId}`;
           if (!scoresByItemFromOthers[itemKey]) scoresByItemFromOthers[itemKey] = [];
           
-          // Efficiently find other scores for the same item
           responses.forEach(r2 => { 
-              if (r2.responseByStudentId && r2.responseByStudentId !== r1.responseByStudentId && // Different evaluator
-                  r2.evaluatedStudentId === r1.evaluatedStudentId &&    // Same evaluated student
-                  r2.responseToQuestionId === r1.responseToQuestionId && // Same question
+              if (r2.responseByStudentId && r2.responseByStudentId !== r1.responseByStudentId &&
+                  r2.evaluatedStudentId === r1.evaluatedStudentId &&
+                  r2.responseToQuestionId === r1.responseToQuestionId && 
                   r2.responseType === "SCORE" && typeof r2.responseValue === 'number' && !isNaN(r2.responseValue)) { 
                   scoresByItemFromOthers[itemKey].push(r2.responseValue);
               }
           });
-          // No need to create a new Set for each r1 if scoresByItemFromOthers[itemKey] accumulates all relevant scores.
-          // A Set can be applied once per itemKey after the loops if duplicates are a concern from the source data itself.
       }
   });
 
-  // Deduplicate and calculate medians
   let groupMediansByItem = {}; 
   for(const itemKey in scoresByItemFromOthers){
-    if (Object.prototype.hasOwnProperty.call(scoresByItemFromOthers, itemKey)) { // Good practice
-      const uniqueScores = [...new Set(scoresByItemFromOthers[itemKey])]; // Deduplicate here
+    if (Object.prototype.hasOwnProperty.call(scoresByItemFromOthers, itemKey)) {
+      const uniqueScores = [...new Set(scoresByItemFromOthers[itemKey])];
       if (uniqueScores.length > 0) {
         groupMediansByItem[itemKey] = calculateMedianFromArray(uniqueScores); 
       }
@@ -180,18 +168,16 @@ function generateEvaluatorAnalyticsAndWeights() {
   
   // --- Calculate advanced metrics for each evaluator ---
   for (const evaluatorId in evaluatorMetrics) {
-    if (Object.prototype.hasOwnProperty.call(evaluatorMetrics, evaluatorId)) { // Good practice
+    if (Object.prototype.hasOwnProperty.call(evaluatorMetrics, evaluatorId)) {
       const metrics = evaluatorMetrics[evaluatorId];
       
       if (metrics.scoresGivenValues.length > 0) {
           metrics.avgScoreGiven = calculateMean(metrics.scoresGivenValues);
           metrics.stdDevScoresGiven = metrics.scoresGivenValues.length >= 2 ? calculateStdDev(metrics.scoresGivenValues, metrics.avgScoreGiven) : 0;
-          // Math.min/max on empty array is Infinity/-Infinity, handle this if scoresGivenValues could be empty (already handled by outer if)
           const minVal = Math.min(...metrics.scoresGivenValues);
           const maxVal = Math.max(...metrics.scoresGivenValues);
           metrics.rangeScoresUsed = maxVal - minVal;
-          // Assuming scores are 1-4 or 1-5. If max possible score is different, adjust '4'
-          const MAX_POSSIBLE_SCORE = 4; // Or 5, define this as a constant if it varies
+          const MAX_POSSIBLE_SCORE = 4;
           const MIN_POSSIBLE_SCORE = 1;
           metrics.percentMaxScore = (metrics.scoresGivenValues.filter(s => s === MAX_POSSIBLE_SCORE).length / metrics.scoresGivenValues.length) * 100;
           metrics.percentMinScore = (metrics.scoresGivenValues.filter(s => s === MIN_POSSIBLE_SCORE).length / metrics.scoresGivenValues.length) * 100;
@@ -214,7 +200,7 @@ function generateEvaluatorAnalyticsAndWeights() {
           }
       });
       for (const peerId in perPeerScoresGiven) {
-          if (Object.prototype.hasOwnProperty.call(perPeerScoresGiven, peerId)) { // Good practice
+          if (Object.prototype.hasOwnProperty.call(perPeerScoresGiven, peerId)) {
             if (perPeerScoresGiven[peerId].length >= 2) { 
                 intraPeerStdDevsAccumulator.push(calculateStdDev(perPeerScoresGiven[peerId]));
             }
@@ -231,7 +217,6 @@ function generateEvaluatorAnalyticsAndWeights() {
               }
           }
       });
-      // metrics.absDeviationsFromGroupMedianArray = absDeviationsTempArray; // Storing the array might be much if not used later
       metrics.avgAbsDevFromGroupMedian = absDeviationsTempArray.length > 0 ? calculateMean(absDeviationsTempArray) : 0;
       
       metrics.percentScoresWithComment = metrics.totalScoredAssessments > 0 ? (metrics.assessmentsWhereCommentProvided / metrics.totalScoredAssessments) * 100 : 0;
@@ -244,7 +229,7 @@ function generateEvaluatorAnalyticsAndWeights() {
   let evaluatorWeights = {}; 
   Logger.log("Analytics: Calculating evaluator weights...");
   for (const evaluatorId in evaluatorMetrics) {
-    if (Object.prototype.hasOwnProperty.call(evaluatorMetrics, evaluatorId)) { // Good practice
+    if (Object.prototype.hasOwnProperty.call(evaluatorMetrics, evaluatorId)) {
       const metrics = evaluatorMetrics[evaluatorId];
       let weight = 1.0; 
       const numScoresGiven = metrics.scoresGivenValues.length;
@@ -254,33 +239,31 @@ function generateEvaluatorAnalyticsAndWeights() {
       } else if (numScoresGiven < 5) { 
           weight = 0.4; 
       } else { 
-          // Example weighting logic - this is highly configurable
           if (metrics.avgScoreGiven > 3.5) weight -= 0.25;  
           else if (metrics.avgScoreGiven > 3.2) weight -= 0.15; 
           if (metrics.avgScoreGiven < 2.0) weight -= 0.25;  
           else if (metrics.avgScoreGiven < 2.3) weight -= 0.15; 
           
           if (metrics.percentMaxScore > 70) weight -= 0.10; 
-          if (metrics.percentMaxScore > 90) weight -= 0.15; // Cumulative deduction
+          if (metrics.percentMaxScore > 90) weight -= 0.15;
           
-          if (metrics.percentMinScore < 10 && metrics.avgScoreGiven > 3.2) weight -= 0.10; // Few low scores when generally rating high
+          if (metrics.percentMinScore < 10 && metrics.avgScoreGiven > 3.2) weight -= 0.10;
           
           if (metrics.distinctScoreValuesUsed.size === 1) weight -= 0.30; 
           else if (metrics.distinctScoreValuesUsed.size === 2) weight -= 0.20;
           
-          if (metrics.distinctScoreValuesUsed.size >= 3 && metrics.stdDevScoresGiven < 0.50 && metrics.scoresGivenValues.length >=10) weight -= 0.10; // Low variance despite using multiple scores
+          if (metrics.distinctScoreValuesUsed.size >= 3 && metrics.stdDevScoresGiven < 0.50 && metrics.scoresGivenValues.length >=10) weight -= 0.10;
           
-          if (metrics.avgIntraPeerSd < 0.25 && metrics.totalScoredAssessments >= 10) weight -= 0.15; // Very consistent scoring for individual peers
+          if (metrics.avgIntraPeerSd < 0.25 && metrics.totalScoredAssessments >= 10) weight -= 0.15;
           
-          if (metrics.avgAbsDevFromGroupMedian > 0.70 && numScoresGiven >= 10) weight -= 0.15; // Often deviates from group consensus
+          if (metrics.avgAbsDevFromGroupMedian > 0.70 && numScoresGiven >= 10) weight -= 0.15;
           
           if (metrics.percentScoresWithComment > 30) weight += 0.05;
-          if (metrics.percentScoresWithComment > 50) weight += 0.05; // Cumulative addition
+          if (metrics.percentScoresWithComment > 50) weight += 0.05;
       }
 
-      weight = Math.max(0.0, Math.min(1.0, weight)); // Clamp weight between 0.0 and 1.0
+      weight = Math.max(0.0, Math.min(1.0, weight));
       
-      // Ensure a minimum weight if any scores were given, unless explicitly 0.0
       if (numScoresGiven > 0 && weight < 0.4 && weight !== 0.0) {
           weight = 0.4; 
       }
@@ -294,12 +277,10 @@ function generateEvaluatorAnalyticsAndWeights() {
   // --- Prepare Data Rows for Output Sheet ---
   let outputDataRows = [];
   const evaluatorIdsFromMetrics = Object.keys(evaluatorMetrics);
-  // Logger.log(`DEBUG SORT: About to sort ${evaluatorIdsFromMetrics.length} evaluator IDs. Sample IDs: ${evaluatorIdsFromMetrics.slice(0,5).join(', ')}`);
 
   const sortedEvaluatorIdsForReport = evaluatorIdsFromMetrics.sort((a, b) => {
       const metricA = evaluatorMetrics[a];
       const metricB = evaluatorMetrics[b];
-      // Fallback to ID sort if name is missing or not a string
       const aName = (metricA && typeof metricA.studentName === 'string' && metricA.studentName) ? metricA.studentName : a; 
       const bName = (metricB && typeof metricB.studentName === 'string' && metricB.studentName) ? metricB.studentName : b; 
       return aName.localeCompare(bName);
@@ -318,8 +299,8 @@ function generateEvaluatorAnalyticsAndWeights() {
       (typeof metrics.percentMaxScore === 'number' && metrics.scoresGivenValues.length > 0) ? metrics.percentMaxScore.toFixed(1) + "%" : "N/A",
       (typeof metrics.percentMinScore === 'number' && metrics.scoresGivenValues.length > 0) ? metrics.percentMinScore.toFixed(1) + "%" : "N/A",
       (typeof metrics.percentMidScores === 'number' && metrics.scoresGivenValues.length > 0) ? metrics.percentMidScores.toFixed(1) + "%" : "N/A",
-      (typeof metrics.avgIntraPeerSd === 'number') ? metrics.avgIntraPeerSd.toFixed(2) : "N/A", // Allows 0
-      (typeof metrics.avgAbsDevFromGroupMedian === 'number') ? metrics.avgAbsDevFromGroupMedian.toFixed(2) : "N/A", // Allows 0
+      (typeof metrics.avgIntraPeerSd === 'number') ? metrics.avgIntraPeerSd.toFixed(2) : "N/A",
+      (typeof metrics.avgAbsDevFromGroupMedian === 'number') ? metrics.avgAbsDevFromGroupMedian.toFixed(2) : "N/A",
       metrics.commentsMadeCount || 0, 
       (typeof metrics.percentScoresWithComment === 'number') ? metrics.percentScoresWithComment.toFixed(1) + "%" : "N/A",
       (typeof metrics.avgCommentLength === 'number' && metrics.commentLengths && metrics.commentLengths.length > 0) ? metrics.avgCommentLength.toFixed(1) : "N/A",
@@ -344,23 +325,24 @@ function generateEvaluatorAnalyticsAndWeights() {
     numericalHeaders.forEach(header => {
         const colIdx = analyticsHeaders.indexOf(header);
         if (colIdx !== -1) {
-            // Get current values to avoid overwriting "" with 0 for formatting if cell is "N/A"
             const columnData = reportSheet.getRange(2, colIdx + 1, outputDataRows.length, 1).getValues();
-            const formats = columnData.map(row => [row[0] === "N/A" ? "@" : "0.00"]); // Or "0.0%" for percentages, etc.
+            const formats = columnData.map(row => [row[0] === "N/A" ? "@" : "0.00"]);
             reportSheet.getRange(2, colIdx + 1, outputDataRows.length, 1)
                        .setHorizontalAlignment("right")
-                       .setNumberFormats(formats); // Apply formats row by row
+                       .setNumberFormats(formats);
         }
     });
     reportSheet.autoResizeColumns(1, analyticsHeaders.length);
     Logger.log(`Evaluator analytics and weights generated in sheet "${analyticsSheetName}".`);
-    ui.alert("Analytics & Weights Generated", `Evaluator analytics and weights written to sheet: "${analyticsSheetName}".`, ui.ButtonSet.OK);
+    // ✅ FIXED: Removed ui.alert() - web interface will show success message based on return value
+    Logger.log(`SUCCESS: Analytics & Weights Generated - Evaluator analytics and weights written to sheet: "${analyticsSheetName}".`);
   } else {
     reportSheet.getRange(2,1).setValue("No evaluator metrics to display (outputDataRows was empty).");
     Logger.log("No evaluator metrics data to write for analytics sheet because outputDataRows was empty.");
-    ui.alert("Info", "No evaluator metrics were generated to display.", ui.ButtonSet.OK);
+    // ✅ FIXED: Removed ui.alert() - throw error instead for web interface to handle
+    throw new Error("No evaluator metrics were generated to display.");
   }
   ss.setActiveSheet(reportSheet);
-  Logger.log("--- Evaluator Analytics & Weight Generation Complete ---");
+  Logger.log("--- Evaluator Analytics & Weight Generation Complete (Web-Safe) ---");
   return evaluatorWeights; 
 }

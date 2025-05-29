@@ -1,17 +1,40 @@
 {
   "name": "peer-assessment-v2",
   "version": "1.0.0",
-  "description": "Peer Assessment System V2",
+  "description": "Peer Assessment System V2 - Google Apps Script Web Application",
   "private": true,
+  "main": "src/Config.js",
   "scripts": {
     "status": "clasp status",
     "pull": "clasp pull",
     "push": "clasp push",
     "deploy": "clasp deploy",
     "logs": "clasp logs",
-    "open": "open 'https://script.google.com/d/1vu9fmueK0Y0u_eBZZBI6N_qJnvvLcXXz_5vGNp6SrAYQKY5MUruC8bJH/edit'"
+    "open": "clasp open",
+    "login": "clasp login",
+    "logout": "clasp logout",
+    "push:watch": "clasp push --watch",
+    "deploy:prod": "clasp deploy --description 'Production Release'",
+    "validate": "clasp push --dry-run"
   },
+  "repository": {
+    "type": "git",
+    "url": "your-repository-url"
+  },
+  "keywords": [
+    "google-apps-script",
+    "education",
+    "peer-assessment",
+    "university",
+    "evaluation-system"
+  ],
+  "author": "Ian Chen",
+  "license": "MIT",
   "devDependencies": {
-    "@google/clasp": "2.4.2"
+    "@google/clasp": "^2.4.2",
+    "@types/google-apps-script": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }

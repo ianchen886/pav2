@@ -1,5 +1,7 @@
+/* global getStudentDetailsByEmail, getUnitMembers, checkIfInstructor, getAllActiveStudentsForFaculty */
+
 /**
- * @file RealUserTestingScript.js
+ * @file UserTestingScript.js
  * @description Testing script to simulate different real student logins for development
  * Uses actual students from the master list for realistic testing
  */
@@ -172,89 +174,9 @@ function createFacultySession(email) {
 }
 
 /**
- * Get all active students for faculty access
- * This is the key function that allows faculty to see all students
- */
-function getAllActiveStudentsForFaculty() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(PA_MASTER_STUDENT_LIST_SHEET_NAME);
-    
-    if (!sheet) {
-      Logger.log("Master student list sheet not found");
-      return [];
-    }
-    
-    const data = sheet.getDataRange().getValues();
-    if (data.length < 2) {
-      Logger.log("No student data found");
-      return [];
-    }
-    
-    const headers = data[0].map(h => h ? h.toString().trim() : "");
-    
-    const idColIdx = headers.indexOf("studentId");
-    const nameColIdx = headers.indexOf("studentName");
-    const emailColIdx = headers.indexOf("email");
-    const unit1ColIdx = headers.indexOf("unit1");
-    const statusColIdx = headers.indexOf("status");
-    
-    if (idColIdx === -1 || nameColIdx === -1 || statusColIdx === -1) {
-      Logger.log("Required columns not found in master student list");
-      return [];
-    }
-    
-    const allStudents = [];
-    
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const studentId = row[idColIdx] ? row[idColIdx].toString().trim().toUpperCase() : null;
-      const status = row[statusColIdx] ? row[statusColIdx].toString().trim().toLowerCase() : "";
-      let unit1 = row[unit1ColIdx] ? row[unit1ColIdx].toString().trim().toUpperCase() : "";
-      
-      // Clean unit format
-      if (unit1.startsWith("UNIT ") && unit1.length > 5) {
-        unit1 = unit1.substring(5, 6);
-      }
-      
-      // Include if: active/enrolled, valid ID
-      if ((status === "active" || status === "enrolled") && 
-          studentId && /^[A-Z]{1}[0-9]{9}$/.test(studentId)) {
-        
-        allStudents.push({
-          studentId: studentId,
-          studentName: row[nameColIdx] ? row[nameColIdx].toString().trim() : `[Name for ${studentId}]`,
-          studentEmail: row[emailColIdx] ? row[emailColIdx].toString().trim().toLowerCase() : "",
-          productionUnit: unit1 || 'UNASSIGNED',
-          status: status
-        });
-      }
-    }
-    
-    // Sort by unit, then by name for organized display
-    allStudents.sort((a, b) => {
-      if (a.productionUnit !== b.productionUnit) {
-        return a.productionUnit.localeCompare(b.productionUnit);
-      }
-      return a.studentName.localeCompare(b.studentName);
-    });
-    
-    Logger.log(`Found ${allStudents.length} active students for faculty access`);
-    return allStudents;
-    
-  } catch (error) {
-    Logger.log(`Error getting all active students: ${error.message}`);
-    return [];
-  }
-}
-
-/**
- * Testing utility functions
- */
-
-/**
  * Quick function to switch test users - call this from Apps Script editor
  */
+// eslint-disable-next-line no-unused-vars
 function switchTestUser(email) {
   if (TEST_STUDENT_EMAILS.includes(email)) {
     // This would require modifying the CURRENT_TEST_EMAIL constant
@@ -268,6 +190,7 @@ function switchTestUser(email) {
 /**
  * List all available test users - call this from Apps Script editor
  */
+// eslint-disable-next-line no-unused-vars
 function listTestUsers() {
   Logger.log("Available test student emails:");
   TEST_STUDENT_EMAILS.forEach((email, index) => {
@@ -285,6 +208,7 @@ function listTestUsers() {
 /**
  * Test all users to make sure they exist in master list
  */
+// eslint-disable-next-line no-unused-vars
 function validateTestUsers() {
   Logger.log("Validating test users against master list:");
   
@@ -305,11 +229,13 @@ function validateTestUsers() {
 /**
  * Disable test mode and use real authentication
  */
+// eslint-disable-next-line no-unused-vars
 function disableTestMode() {
   Logger.log("To disable test mode, set DEVELOPMENT_MODE = false and CURRENT_TEST_EMAIL = null in the script");
 }
 
 // Add wrapper for backwards compatibility
+// eslint-disable-next-line no-unused-vars
 function getCurrentUser() {
   return getCurrentUserSession();
 }
