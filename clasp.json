@@ -1,19 +1,23 @@
 {
-  "scriptId": "1vu9fmueK0Y0u_eBZZBI6N_qJnvvLcXXz_5vGNp6SrAYQKY5MUruC8bJH",
-  "rootDir": "./src",
+  "scriptId": "1vu9fmueK0Y0u_eBZZBI6N_qJnvvLcXXz_5vGNp6SrAY0KY5MUruC8bJH",
+  "rootDir": ".",
   "fileExtension": "js",
   "filePushOrder": [
-    "Config.js",
-    "Utils.js",
-    "Models.js",
-    "Parser_V2.js",
-    "SheetUtils.js",
-    "AuthHandler.js",
-    "MockDataGenerator.js", 
-    "Workflow_Analytics.js",
-    "Workflow_Scoring.js",
-    "Workflow_Reporting.js",
-    "MainMenu.js",
-    "Login.html"
+    "src/Config.js",
+    "src/Utils.js",
+    "src/Models.js",
+    "src/Parser_V2.js",
+    "src/SheetUtils.js",
+    "src/UserTestingScript.js",
+    "src/AuthHandler.js",
+    "src/MockDataGenerator.js",
+    "src/SubmissionHandler.js",
+    "src/Workflow_Analytics.js",
+    "src/Workflow_Scoring.js",
+    "src/Workflow_Reporting.js",
+    "src/MainMenu.js",
+    "src/WebAPI.js",
+    "Login.html",
+    "AssessmentInterface.html"
   ]
 }

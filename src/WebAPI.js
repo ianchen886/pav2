@@ -53,13 +53,18 @@ function doPost(e) {
 // These are called directly by the HTML interface
 // ==============================================
 
-/**
- * Get current user session (for frontend compatibility)
- * This matches what the HTML expects to call
- */
-// eslint-disable-next-line no-unused-vars
 function getCurrentUser() {
-  return getCurrentUserSession();
+  // Use the AuthHandler instead of doing our own authentication
+  try {
+    const userSession = getCurrentUserSession(); // This calls AuthHandler.js
+    return userSession;
+  } catch (error) {
+    Logger.log(`getCurrentUser error: ${error.message}`);
+    return {
+      isAuthenticated: false,
+      error: error.message
+    };
+  }
 }
 
 /**
@@ -129,20 +134,11 @@ function getQuestionDefinitionsForWeb() {
 // INTERFACE CREATION FUNCTIONS
 // ==============================================
 
-/**
- * Create the student assessment interface
- */
 function createStudentInterface(userSession) {
-  // Use your existing AssessmentInterface.html file
-  const template = HtmlService.createTemplateFromFile('AssessmentInterface');
+  Logger.log('Creating student interface for user: ' + userSession.email);
   
-  // Pass user session data to the template if needed
-  template.userSession = userSession;
-  template.studentName = userSession.studentName;
-  template.studentId = userSession.studentId;
-  template.productionUnit = userSession.productionUnit;
-  
-  return template.evaluate()
+  // Just return the HTML file directly - no data passing needed
+  return HtmlService.createHtmlOutputFromFile('AssessmentInterface')
     .setTitle('Peer Assessment Portal')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
@@ -563,4 +559,113 @@ function getSystemStatisticsSafe() {
       error: error.message 
     };
   }
+}
+// Add this debug function
+function debugFunctionAvailability() {
+  Logger.log("=== FUNCTION AVAILABILITY DEBUG ===");
+  
+  // Test if functions exist
+  const functions = {
+    getCurrentUser: typeof getCurrentUser,
+    getCurrentUserSession: typeof getCurrentUserSession,
+    getQuestionDefinitionsForWeb: typeof getQuestionDefinitionsForWeb,
+    submitPeerAssessments: typeof submitPeerAssessments
+  };
+  
+  Logger.log("Function types:", JSON.stringify(functions));
+  
+  // Test actual calls
+  try {
+    const session = getCurrentUser();
+    Logger.log("getCurrentUser works:", !!session);
+  } catch (error) {
+    Logger.log("getCurrentUser error:", error.message);
+  }
+  
+  try {
+    const questions = getQuestionDefinitionsForWeb();
+    Logger.log("getQuestionDefinitionsForWeb works:", Object.keys(questions).length, "questions");
+  } catch (error) {
+    Logger.log("getQuestionDefinitionsForWeb error:", error.message);
+  }
+  
+  return functions;
+}
+
+/**
+ * Get completed assessments for the current user
+ * Returns array of student IDs that have been evaluated by this user
+ */
+function getCompletedAssessments() {
+  try {
+    Logger.log('getCompletedAssessments called');
+    
+    // Get current user session to identify evaluator
+    const userSession = getCurrentUserSession();
+    if (!userSession || !userSession.isAuthenticated) {
+      Logger.log('User not authenticated');
+      return [];
+    }
+    
+    const evaluatorId = userSession.studentId;
+    Logger.log('Checking completed assessments for evaluator: ' + evaluatorId);
+    
+    // Get submissions sheet
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const submissionsSheet = ss.getSheetByName('PaRawSubmissionsV2');
+    
+    if (!submissionsSheet) {
+      Logger.log('PaRawSubmissionsV2 sheet not found');
+      return [];
+    }
+    
+    const data = submissionsSheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      Logger.log('No submission data found');
+      return [];
+    }
+    
+    // Find column indices
+    const headers = data[0];
+    const evaluatorIdCol = headers.indexOf('evaluatorId');
+    const evaluatedStudentIdCol = headers.indexOf('evaluatedStudentId');
+    const responseTypeCol = headers.indexOf('responseType');
+    
+    if (evaluatorIdCol === -1 || evaluatedStudentIdCol === -1 || responseTypeCol === -1) {
+      Logger.log('Required columns not found in submissions sheet');
+      return [];
+    }
+    
+    // Find unique students this evaluator has submitted SCORE responses for
+    const completedStudents = new Set();
+    
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const rowEvaluatorId = row[evaluatorIdCol];
+      const rowEvaluatedStudentId = row[evaluatedStudentIdCol];
+      const rowResponseType = row[responseTypeCol];
+      
+      // Check if this is a score submission from our evaluator
+      if (rowEvaluatorId === evaluatorId && rowResponseType === 'SCORE' && rowEvaluatedStudentId) {
+        completedStudents.add(rowEvaluatedStudentId);
+      }
+    }
+    
+    const completedArray = Array.from(completedStudents);
+    Logger.log(`Found ${completedArray.length} completed assessments: ${completedArray.join(', ')}`);
+    
+    return completedArray;
+    
+  } catch (error) {
+    Logger.log(`Error in getCompletedAssessments: ${error.message}`);
+    return [];
+  }
+}
+
+// === TEMPORARY TEST FUNCTION ===
+function testGetCompletedAssessments() {
+  const completed = getCompletedAssessments();
+  console.log('Completed assessments found:', completed);
+  console.log('Should include A113031046:', completed.includes('A113031046'));
+  return completed;
 }

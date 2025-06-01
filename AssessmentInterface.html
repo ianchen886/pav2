@@ -441,6 +441,20 @@
             </div>
         </div>
         
+        <!-- DEBUG PANEL - REMOVE WHEN FIXED -->
+        <!-- <div style="background: #ff6b6b; color: white; padding: 15px; margin: 10px 0; border-radius: 5px;">
+            <h3>🔧 DEBUG PANEL</h3>
+            <button onclick="debugBasicInfo()" style="background: orange; color: white; padding: 10px; margin: 5px; border: none; border-radius: 3px; cursor: pointer;">
+                1. Basic Info Debug
+            </button>
+            <button onclick="debugQuestionDisplay()" style="background: red; color: white; padding: 10px; margin: 5px; border: none; border-radius: 3px; cursor: pointer;">
+                2. Force Show Questions
+            </button>
+            <button onclick="debugPlaceholders()" style="background: purple; color: white; padding: 10px; margin: 5px; border: none; border-radius: 3px; cursor: pointer;">
+                3. Check Placeholders
+            </button>
+        </div> -->
+        
         <div id="loadingIndicator" class="loading">
             <p>🔄 Loading your assessment form...</p>
         </div>
@@ -504,9 +518,6 @@
             <button id="submitBtn" class="submit-btn" onclick="submitCurrentAssessment()" disabled>
                 📝 Submit Assessment
             </button>
-            <button id="submitAllBtn" class="submit-btn" onclick="submitAllAssessments()" style="display: none;">
-                🎯 Submit All Assessments
-            </button>
         </div>
     </div>
 
@@ -521,30 +532,148 @@
         
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== DOM CONTENT LOADED ===');
+            console.log('Starting initialization...');
             initializeAssessment();
         });
         
+        // DEBUG FUNCTIONS
+        function debugBasicInfo() {
+            console.log('=== BASIC DEBUG INFO ===');
+            alert('Debug button clicked! Check console for details.');
+            
+            console.log('1. User Session:', typeof userSession, userSession);
+            console.log('2. Question Definitions:', typeof questionDefinitions, questionDefinitions);
+            console.log('3. All Students:', typeof allStudents, allStudents);
+            console.log('4. Current User:', userSession?.studentName);
+            console.log('5. Question Count:', Object.keys(questionDefinitions || {}).length);
+            console.log('6. DOM Ready:', document.readyState);
+            
+            // Check if elements exist
+            console.log('7. Key Elements:');
+            console.log('   - studentSelector:', !!document.getElementById('studentSelector'));
+            console.log('   - assessmentContainer:', !!document.getElementById('assessmentContainer'));
+            console.log('   - studentDropdown:', !!document.getElementById('studentDropdown'));
+            
+            // Show current visibility
+            console.log('8. Element Visibility:');
+            const selector = document.getElementById('studentSelector');
+            const assessment = document.getElementById('assessmentContainer');
+            console.log('   - studentSelector display:', selector?.style.display);
+            console.log('   - assessmentContainer display:', assessment?.style.display);
+        }
+
+        function debugQuestionDisplay() {
+            console.log('=== FORCE QUESTION DISPLAY ===');
+            alert('Forcing question display...');
+            
+            try {
+                // Force show assessment container
+                document.getElementById('studentSelector').style.display = 'none';
+                document.getElementById('loadingIndicator').style.display = 'none';
+                document.getElementById('assessmentContainer').style.display = 'block';
+                document.getElementById('submitContainer').style.display = 'block';
+                
+                // Create fake student for testing
+                const fakeStudent = {
+                    studentId: 'TEST123',
+                    studentName: 'Test Student',
+                    productionUnit: 'A'
+                };
+                
+                // Force questions
+                const container = document.getElementById('assessmentContainer');
+                container.innerHTML = `
+                    <h2>🧪 FORCED QUESTION DISPLAY TEST</h2>
+                    <p>User: ${userSession?.studentName || 'Unknown'}</p>
+                    <p>Questions Available: ${Object.keys(questionDefinitions || {}).length}</p>
+                    <div id="forced-questions"></div>
+                `;
+                
+                // Try to create questions
+                if (questionDefinitions && Object.keys(questionDefinitions).length > 0) {
+                    const questionsHTML = createQuestionsHTML('TEST123');
+                    document.getElementById('forced-questions').innerHTML = questionsHTML;
+                    console.log('Questions HTML generated:', questionsHTML.length, 'characters');
+                } else {
+                    document.getElementById('forced-questions').innerHTML = '<p style="color: red;">❌ No question definitions available!</p>';
+                }
+                
+            } catch (error) {
+                console.error('Error in debugQuestionDisplay:', error);
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function debugPlaceholders() {
+            console.log('=== PLACEHOLDER DEBUG ===');
+            alert('Checking placeholder replacement...');
+            
+            // Get the raw HTML to see if placeholders were replaced
+            const bodyHTML = document.body.innerHTML;
+            
+            console.log('Checking for unreplaced placeholders...');
+            
+            if (bodyHTML.includes('USERDATA_PLACEHOLDER')) {
+                console.error('❌ USERDATA_PLACEHOLDER not replaced!');
+                alert('❌ USERDATA_PLACEHOLDER was not replaced by server!');
+            } else {
+                console.log('✅ USERDATA_PLACEHOLDER was replaced');
+            }
+            
+            if (bodyHTML.includes('QUESTIONS_PLACEHOLDER')) {
+                console.error('❌ QUESTIONS_PLACEHOLDER not replaced!');
+                alert('❌ QUESTIONS_PLACEHOLDER was not replaced by server!');
+            } else {
+                console.log('✅ QUESTIONS_PLACEHOLDER was replaced');
+            }
+            
+            // Check what the placeholders became
+            console.log('UserSession type:', typeof userSession);
+            console.log('QuestionDefinitions type:', typeof questionDefinitions);
+            
+            if (typeof userSession === 'string') {
+                console.error('❌ userSession is still a string - placeholder not properly replaced');
+            }
+            
+            if (typeof questionDefinitions === 'string') {
+                console.error('❌ questionDefinitions is still a string - placeholder not properly replaced');
+            }
+        }
+        
+        // In your AssessmentInterface.html, replace the initializeAssessment function with this:
+
         async function initializeAssessment() {
             try {
                 showLoading(true);
                 
-                // Get user session
-                userSession = await getUserSession();
+                console.log('Loading user session via API...');
+                userSession = await getUserSession();  // Direct API call
+                
+                console.log('Loading questions via API...');
+                questionDefinitions = await getQuestionDefinitions();  // Direct API call
+                
+                console.log('Data loaded - User:', userSession?.studentName, 'Questions:', Object.keys(questionDefinitions || {}).length);
+                
+                // Validate data
                 if (!userSession || !userSession.isAuthenticated) {
                     throw new Error('Authentication failed. Please refresh and try again.');
                 }
                 
+                if (!questionDefinitions || Object.keys(questionDefinitions).length === 0) {
+                    throw new Error('No questions available. Please contact your instructor.');
+                }
+                
                 updateUserDisplay();
-                
-                // Load questions
-                questionDefinitions = await getQuestionDefinitions();
-                
-                // Initialize assessment data structure
                 initializeAssessmentData();
-                
-                // Show student selector
+
+                // Load completed assessments before showing selector
+                console.log('Loading completed assessments...');
+                const completed = await getCompletedAssessments();
+                completed.forEach(studentId => completedAssessments.add(studentId));
+                console.log('Completed assessments loaded:', completed);
+
                 showStudentSelector();
-                
                 showLoading(false);
                 updateProgress();
                 
@@ -567,63 +696,118 @@
         }
         
         function showStudentSelector() {
-            // Hide other containers
-            document.getElementById('assessmentContainer').style.display = 'none';
-            document.getElementById('submitContainer').style.display = 'none';
-            document.getElementById('progressContainer').classList.remove('show');
-            
-            // Show student selector
-            const selector = document.getElementById('studentSelector');
-            const dropdown = document.getElementById('studentDropdown');
-            const selectBtn = document.getElementById('selectStudentBtn');
-            
-            // Show faculty notice if user is faculty
-            const facultyNotice = document.getElementById('facultyNotice');
-            const unitFilter = document.getElementById('unitFilter');
-            
-            if (userSession.role === 'instructor' || userSession.isFaculty) {
-                facultyNotice.style.display = 'block';
-                unitFilter.style.display = 'flex';
-                setupUnitFilter();
-            } else {
-                facultyNotice.style.display = 'none';
-                unitFilter.style.display = 'none';
-            }
-            
-            if (!userSession.unitMembers || userSession.unitMembers.length === 0) {
-                selector.innerHTML = `
-                    <div style="text-align: center; padding: 40px;">
-                        <h3>No Students Available</h3>
-                        <p>No students were found for assessment.</p>
-                        <p>Please contact your administrator if this seems incorrect.</p>
-                    </div>
-                `;
-                selector.style.display = 'block';
-                return;
-            }
-            
-            // Store all students for filtering
-            allStudents = [...userSession.unitMembers];
-            
-            // Populate dropdown
-            populateStudentDropdown(allStudents);
-            
-            // Event listeners
-            dropdown.addEventListener('change', function() {
-                const isSelected = this.value !== '';
-                selectBtn.disabled = !isSelected;
-                selectBtn.textContent = isSelected ? 'Start Assessment' : 'Start Assessment';
-            });
-            
-            selectBtn.addEventListener('click', function() {
-                const selectedStudentId = dropdown.value;
-                if (selectedStudentId) {
-                    showAssessmentForm(selectedStudentId);
+            console.log('=== STUDENT SELECTOR DEBUG ===');
+            console.log('UserSession:', userSession);
+            console.log('Unit members:', userSession?.unitMembers);
+            console.log('Unit members length:', userSession?.unitMembers?.length);
+
+            // Wait for elements to exist with retry logic
+            const waitForElement = (id, maxRetries = 10) => {
+                return new Promise((resolve, reject) => {
+                    let retries = 0;
+                    const checkElement = () => {
+                        const element = document.getElementById(id);
+                        if (element) {
+                            console.log(`✅ Found element: ${id}`);
+                            resolve(element);
+                        } else if (retries < maxRetries) {
+                            retries++;
+                            console.log(`⏳ Waiting for element ${id}, retry ${retries}/${maxRetries}`);
+                            setTimeout(checkElement, 100);
+                        } else {
+                            console.log(`❌ Element ${id} not found after ${maxRetries} retries`);
+                            reject(new Error(`Element ${id} not found`));
+                        }
+                    };
+                    checkElement();
+                });
+            };
+
+            // Wait for all required elements
+            Promise.all([
+                waitForElement('studentSelector'),
+                waitForElement('studentDropdown'),
+                waitForElement('selectStudentBtn'),
+                waitForElement('facultyNotice'),
+                waitForElement('unitFilter')
+            ]).then(([selector, dropdown, selectBtn, facultyNotice, unitFilter]) => {
+                
+                console.log('✅ All elements found, proceeding with setup');
+
+                // Hide other containers
+                const assessmentContainer = document.getElementById('assessmentContainer');
+                const submitContainer = document.getElementById('submitContainer');
+                const progressContainer = document.getElementById('progressContainer');
+                
+                if (assessmentContainer) assessmentContainer.style.display = 'none';
+                if (submitContainer) submitContainer.style.display = 'none';
+                if (progressContainer) progressContainer.classList.remove('show');
+                
+                // Show faculty notice if user is faculty
+                if (userSession.role === 'instructor' || userSession.isFaculty) {
+                    facultyNotice.style.display = 'block';
+                    unitFilter.style.display = 'flex';
+                    setupUnitFilter();
+                } else {
+                    facultyNotice.style.display = 'none';
+                    unitFilter.style.display = 'none';
                 }
+                
+                if (!userSession.unitMembers || userSession.unitMembers.length === 0) {
+                    console.log('NO UNIT MEMBERS - showing error message');
+                    selector.innerHTML = `
+                        <div style="text-align: center; padding: 40px;">
+                            <h3>No Students Available</h3>
+                            <p>No students were found for assessment.</p>
+                            <p>Please contact your administrator if this seems incorrect.</p>
+                            <p><strong>Debug Info:</strong></p>
+                            <p>User: ${userSession.studentName} (${userSession.studentId})</p>
+                            <p>Unit: ${userSession.productionUnit}</p>
+                            <p>Unit Members: ${userSession.unitMembers ? userSession.unitMembers.length : 'null'}</p>
+                        </div>
+                    `;
+                    selector.style.display = 'block';
+                    return;
+                }
+
+                console.log(`Found ${userSession.unitMembers.length} unit members`);
+                
+                // Store all students for filtering
+                allStudents = [...userSession.unitMembers];
+                console.log('All students stored:', allStudents.map(s => s.studentName));
+
+                // Populate dropdown
+                populateStudentDropdown(allStudents);
+                
+                // Event listeners
+                dropdown.addEventListener('change', function() {
+                    console.log('Dropdown changed to:', this.value);
+                    const isSelected = this.value !== '';
+                    selectBtn.disabled = !isSelected;
+                    selectBtn.textContent = isSelected ? 'Start Assessment' : 'Start Assessment';
+                    console.log('Button enabled:', !isSelected);
+                });
+                
+                selectBtn.addEventListener('click', function() {
+                    const selectedStudentId = dropdown.value;
+                    console.log('=== START ASSESSMENT CLICKED ===');
+                    console.log('Selected student ID:', selectedStudentId);
+                    if (selectedStudentId) {
+                        console.log('Calling showAssessmentForm...');
+                        showAssessmentForm(selectedStudentId);
+                    } else {
+                        console.log('No student selected');
+                    }
+                });
+                
+                selector.style.display = 'block';
+                console.log('✅ Student selector now visible');
+                updateCompletedAssessments();
+                
+            }).catch(error => {
+                console.error('❌ Failed to find required elements:', error);
+                showError('Interface elements not found. Please refresh the page.');
             });
-            
-            selector.style.display = 'block';
-            updateCompletedAssessments();
         }
         
         function setupUnitFilter() {
@@ -648,12 +832,16 @@
         }
         
         function populateStudentDropdown(students) {
+            console.log('=== POPULATING DROPDOWN ===');
+            console.log('Students to populate:', students.length);
+            
             const dropdown = document.getElementById('studentDropdown');
             
             // Clear and populate dropdown
             dropdown.innerHTML = '<option value="">-- Select a student to evaluate --</option>';
             
             if (students.length === 0) {
+                console.log('No students to populate');
                 const option = document.createElement('option');
                 option.value = '';
                 option.textContent = 'No students available';
@@ -662,106 +850,113 @@
                 return;
             }
             
-            // Group students by unit for better organization (for faculty)
-            const studentsByUnit = {};
-            students.forEach(student => {
-                const unit = student.productionUnit || 'UNASSIGNED';
-                if (!studentsByUnit[unit]) {
-                    studentsByUnit[unit] = [];
+            students.forEach((student, index) => {
+                console.log(`Adding student ${index + 1}: ${student.studentName} (${student.studentId})`);
+                const option = document.createElement('option');
+                option.value = student.studentId;
+                option.textContent = `${student.studentName} (${student.studentId})`;
+                
+                // Mark as completed if already assessed
+                if (completedAssessments.has(student.studentId)) {
+                    option.textContent += ' ✓';
+                    option.style.color = '#28a745';
                 }
-                studentsByUnit[unit].push(student);
+                
+                dropdown.appendChild(option);
             });
             
-            // Add students to dropdown, grouped by unit if faculty
-            if (userSession.role === 'instructor' || userSession.isFaculty) {
-                Object.keys(studentsByUnit).sort().forEach(unit => {
-                    if (Object.keys(studentsByUnit).length > 1) {
-                        // Add unit header
-                        const optgroup = document.createElement('optgroup');
-                        optgroup.label = unit === 'UNASSIGNED' ? 'Unassigned Students' : `Unit ${unit}`;
-                        dropdown.appendChild(optgroup);
-                    }
-                    
-                    studentsByUnit[unit].sort((a, b) => a.studentName.localeCompare(b.studentName)).forEach(student => {
-                        const option = document.createElement('option');
-                        option.value = student.studentId;
-                        option.textContent = `${student.studentName} (${student.studentId})`;
-                        
-                        // Mark as completed if already assessed
-                        if (completedAssessments.has(student.studentId)) {
-                            option.textContent += ' ✓';
-                            option.style.color = '#28a745';
-                        }
-                        
-                        if (Object.keys(studentsByUnit).length > 1) {
-                            optgroup.appendChild(option);
-                        } else {
-                            dropdown.appendChild(option);
-                        }
-                    });
-                });
-            } else {
-                // Simple list for regular students
-                students.forEach(student => {
-                    const option = document.createElement('option');
-                    option.value = student.studentId;
-                    option.textContent = `${student.studentName} (${student.studentId})`;
-                    
-                    // Mark as completed if already assessed
-                    if (completedAssessments.has(student.studentId)) {
-                        option.textContent += ' ✓';
-                        option.style.color = '#28a745';
-                    }
-                    
-                    dropdown.appendChild(option);
-                });
-            }
+            console.log('Dropdown populated with', students.length, 'students');
         }
-        
+
         function showAssessmentForm(studentId) {
+            console.log('=== SHOW ASSESSMENT FORM ===');
+            console.log('Student ID:', studentId);
+            console.log('All students:', allStudents);
+            
             const member = allStudents.find(m => m.studentId === studentId);
+            console.log('Found member:', member);
+            
             if (!member) {
+                console.error('Selected student not found in allStudents array');
                 showError('Selected student not found.');
                 return;
             }
             
+            console.log('Question definitions available:', !!questionDefinitions);
+            console.log('Number of questions:', Object.keys(questionDefinitions || {}).length);
+            
+            if (!questionDefinitions || Object.keys(questionDefinitions).length === 0) {
+                console.error('No question definitions available');
+                showError('Questions are not available. Please refresh the page.');
+                return;
+            }
+            
             currentlyEvaluating = studentId;
+            console.log('Set currentlyEvaluating to:', currentlyEvaluating);
             
             // Hide selector
+            console.log('Hiding student selector...');
             document.getElementById('studentSelector').style.display = 'none';
             
             // Show progress and assessment containers
+            console.log('Showing assessment containers...');
             document.getElementById('progressContainer').classList.add('show');
             document.getElementById('assessmentContainer').style.display = 'block';
             document.getElementById('submitContainer').style.display = 'block';
             
             // Build assessment form
+            console.log('Building assessment form...');
             buildAssessmentForm(member);
             updateProgress();
+            
+            console.log('=== ASSESSMENT FORM COMPLETE ===');
         }
         
         function buildAssessmentForm(member) {
+            console.log('=== BUILD ASSESSMENT FORM ===');
+            console.log('Building form for:', member.studentName);
+            
             const container = document.getElementById('assessmentContainer');
+            console.log('Assessment container found:', !!container);
             
             // Create assessment card
+            console.log('Creating peer assessment card...');
             const peerCard = createPeerAssessmentCard(member);
+            console.log('Peer card created:', !!peerCard);
             
-            // Clear container and add the back button + card
+            // Clear container and add content
             const backButton = container.querySelector('.back-to-selection');
             container.innerHTML = '';
-            container.appendChild(backButton);
+            if (backButton) {
+                container.appendChild(backButton);
+            } else {
+                const newBackButton = document.createElement('button');
+                newBackButton.className = 'back-to-selection';
+                newBackButton.innerHTML = '← Back to Student Selection';
+                newBackButton.onclick = showStudentSelector;
+                container.appendChild(newBackButton);
+            }
             container.appendChild(peerCard);
             
             // Show the card
             peerCard.classList.add('active');
+            console.log('Assessment form built and activated');
         }
+
         
         function createPeerAssessmentCard(member) {
+            console.log('=== CREATE PEER CARD ===');
+            console.log('Creating card for:', member.studentName);
+            
             const card = document.createElement('div');
             card.className = 'peer-card';
             card.id = `peer-${member.studentId}`;
             
             const initials = member.studentName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            
+            console.log('Creating questions HTML...');
+            const questionsHTML = createQuestionsHTML(member.studentId);
+            console.log('Questions HTML length:', questionsHTML.length);
             
             card.innerHTML = `
                 <div class="peer-header">
@@ -773,18 +968,37 @@
                     </div>
                 </div>
                 <div class="questions-container">
-                    ${createQuestionsHTML(member.studentId)}
+                    ${questionsHTML}
                 </div>
             `;
             
+            console.log('Peer card HTML created');
             return card;
         }
-        
+
         function createQuestionsHTML(peerId) {
+            console.log('=== CREATE QUESTIONS HTML ===');
+            console.log('Creating questions for peer:', peerId);
+            console.log('Available questionDefinitions:', questionDefinitions);
+            console.log('Number of questions to create:', Object.keys(questionDefinitions).length);
+            
+            if (!questionDefinitions || Object.keys(questionDefinitions).length === 0) {
+                console.error('ERROR: No questionDefinitions available for createQuestionsHTML');
+                return '<div class="error">No questions available. Please contact your instructor.</div>';
+            }
+            
             let html = '';
             
-            Object.keys(questionDefinitions).forEach(questionId => {
+            Object.keys(questionDefinitions).sort().forEach((questionId, index) => {
+                console.log(`Processing question ${index + 1}:`, questionId);
                 const question = questionDefinitions[questionId];
+                console.log('Question data:', question);
+                
+                if (!question || !question.questionPrompt) {
+                    console.warn(`Warning: Question ${questionId} missing data:`, question);
+                    return; // Skip this question
+                }
+                
                 html += `
                     <div class="question-block">
                         <div style="color: #667eea; font-weight: bold; font-size: 0.9em;">${questionId}</div>
@@ -811,6 +1025,10 @@
                     </div>
                 `;
             });
+            
+            console.log('=== QUESTIONS HTML CREATED ===');
+            console.log('HTML length:', html.length);
+            console.log('Sample HTML:', html.substring(0, 200) + '...');
             
             return html;
         }
@@ -860,7 +1078,6 @@
             if (!currentlyEvaluating) return;
             
             const submitBtn = document.getElementById('submitBtn');
-            const submitAllBtn = document.getElementById('submitAllBtn');
             const totalQuestions = Object.keys(questionDefinitions).length;
             
             // Check if current assessment is complete
@@ -876,17 +1093,17 @@
             
             submitBtn.disabled = currentCompleted < totalQuestions;
             
-            // For faculty or if all assessments are complete, show submit all option
-            const totalCompleted = completedAssessments.size + (currentCompleted === totalQuestions ? 1 : 0);
-            const totalPeers = allStudents ? allStudents.length : 0;
-            
-            if (userSession.role === 'instructor' || userSession.isFaculty || totalCompleted === totalPeers) {
-                submitAllBtn.style.display = 'block';
-                submitAllBtn.disabled = Object.keys(assessmentData).length === 0;
-            }
+            // Remove all Submit All button logic - only single submit button now
         }
         
         async function submitCurrentAssessment() {
+            // Add confirmation dialog
+            const confirmed = confirm(
+                "📝 Ready to submit this assessment?\n\n" +
+                "Your responses will be saved. You can always come back and " +
+                "re-evaluate this student later if you need to make changes.\n\n" +
+                "Submit now?"
+            );
             if (!currentlyEvaluating) return;
             
             try {
@@ -921,6 +1138,12 @@
         }
         
         async function submitAllAssessments() {
+            // Add confirmation dialog
+            const confirmed = confirm(
+                "⚠️ Important: Once submitted, you cannot edit this assessment.\n\n" +
+                "You would need to complete the entire evaluation again to make changes.\n\n" +
+                "Are you sure you want to submit this assessment?"
+            );
             try {
                 const submitAllBtn = document.getElementById('submitAllBtn');
                 submitAllBtn.disabled = true;
@@ -949,7 +1172,16 @@
         function transformSingleAssessmentData(peerId) {
             const submissions = [];
             const timestamp = new Date().toISOString();
-            const submissionId = `SUBM_${userSession.studentId}_${peerId}_${Date.now()}`;
+            // Generate proper submission ID with readable date and random code
+            const now = new Date();
+            const dateTimeStr = now.getFullYear().toString() + 
+                            (now.getMonth() + 1).toString().padStart(2, '0') + 
+                            now.getDate().toString().padStart(2, '0') +
+                            now.getHours().toString().padStart(2, '0') +
+                            now.getMinutes().toString().padStart(2, '0') +
+                            now.getSeconds().toString().padStart(2, '0');
+            const randomCode = Math.random().toString(36).substring(2, 5).toUpperCase();
+            const submissionId = `SUBM_${userSession.studentId}_${peerId}_${dateTimeStr}_${randomCode}`;
             
             const peerData = assessmentData[peerId];
             if (!peerData) return submissions;
@@ -1051,7 +1283,7 @@
                     const li = document.createElement('li');
                     li.innerHTML = `
                         <span>${member.studentName} (${member.studentId}) ${member.productionUnit ? `- Unit ${member.productionUnit}` : ''}</span>
-                        <button class="edit-btn" onclick="editAssessment('${studentId}')">Edit</button>
+                        <span style="color: #28a745; font-weight: bold;">✓ Completed</span>
                     `;
                     list.appendChild(li);
                 }
@@ -1116,12 +1348,12 @@
         
         // API Functions
         async function getUserSession() {
-            return new Promise((resolve, reject) => {
-                google.script.run
-                    .withSuccessHandler(resolve)
-                    .withFailureHandler(reject)
-                    .getCurrentUserSession();
-            });
+        return new Promise((resolve, reject) => {
+            google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getCurrentUser();  // ← FIXED
+          });
         }
         
         async function getQuestionDefinitions() {
@@ -1129,7 +1361,7 @@
                 google.script.run
                     .withSuccessHandler(resolve)
                     .withFailureHandler(reject)
-                    .getQuestionDefinitions();
+                    .getQuestionDefinitionsForWeb();
             });
         }
         
@@ -1139,6 +1371,15 @@
                     .withSuccessHandler(resolve)
                     .withFailureHandler(reject)
                     .submitPeerAssessments(submissions);
+            });
+        }
+        
+        async function getCompletedAssessments() {
+            return new Promise((resolve, reject) => {
+                google.script.run
+                    .withSuccessHandler(resolve)
+                    .withFailureHandler(reject)
+                    .getCompletedAssessments();
             });
         }
     </script>
