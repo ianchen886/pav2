@@ -354,6 +354,230 @@ The system generates detailed reports showing:
 3. **Final score composition** showing contribution of each evaluator
 4. **Statistical summary** of evaluation patterns across the class
 
+## 💻 Actual Implementation Code
+
+### **Weight Calculation Function (from Workflow_Analytics.js)**
+```javascript
+function calculateEvaluatorWeight(evaluatorData) {
+  // Step 1: Calculate response consistency (Standard Deviation)
+  const ratings = evaluatorData.ratings;
+  const mean = ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+  const variance = ratings.reduce((sum, rating) => sum + Math.pow(rating - mean, 2), 0) / (ratings.length - 1);
+  const standardDeviation = Math.sqrt(variance);
+  
+  // Step 2: Determine consistency factor
+  let consistencyFactor;
+  if (standardDeviation < 0.5) {
+    consistencyFactor = 0.6;  // Too little discrimination
+  } else if (standardDeviation <= 2.0) {
+    consistencyFactor = 1.0;  // Optimal range
+  } else {
+    consistencyFactor = 0.7;  // Too much inconsistency
+  }
+  
+  // Step 3: Calculate central tendency bias factor
+  let biasFactor;
+  if (mean <= 1.5 || mean >= 4.5) {
+    biasFactor = 0.7;   // Extreme bias
+  } else if ((mean <= 2.0 && mean > 1.5) || (mean >= 4.0 && mean < 4.5)) {
+    biasFactor = 0.85;  // Moderate bias
+  } else {
+    biasFactor = 1.0;   // Balanced evaluation
+  }
+  
+  // Step 4: Calculate completion factor
+  const completionRate = evaluatorData.studentsEvaluated / evaluatorData.totalStudentsAssigned;
+  let completionFactor;
+  if (completionRate >= 1.0) {
+    completionFactor = 1.0;
+  } else if (completionRate >= 0.8) {
+    completionFactor = 0.9;
+  } else if (completionRate >= 0.6) {
+    completionFactor = 0.7;
+  } else if (completionRate >= 0.4) {
+    completionFactor = 0.5;
+  } else {
+    completionFactor = 0.3;
+  }
+  
+  // Step 5: Calculate quality factor (based on comment length)
+  const avgCommentLength = evaluatorData.totalCommentLength / evaluatorData.commentCount;
+  let qualityFactor;
+  if (avgCommentLength >= 50) {
+    qualityFactor = 1.1;
+  } else if (avgCommentLength >= 20) {
+    qualityFactor = 1.0;
+  } else if (avgCommentLength >= 10) {
+    qualityFactor = 0.95;
+  } else {
+    qualityFactor = 0.9;
+  }
+  
+  // Step 6: Calculate raw weight
+  const baseWeight = 1.0;
+  const rawWeight = baseWeight * consistencyFactor * biasFactor * completionFactor * qualityFactor;
+  
+  return {
+    rawWeight: rawWeight,
+    factors: {
+      consistency: consistencyFactor,
+      bias: biasFactor,
+      completion: completionFactor,
+      quality: qualityFactor
+    },
+    statistics: {
+      mean: mean,
+      standardDeviation: standardDeviation,
+      completionRate: completionRate,
+      avgCommentLength: avgCommentLength
+    }
+  };
+}
+```
+
+### **Weight Normalization Function**
+```javascript
+function normalizeWeights(evaluatorWeights) {
+  // Calculate sum of all raw weights
+  const sumRawWeights = evaluatorWeights.reduce((sum, evaluator) => sum + evaluator.rawWeight, 0);
+  const numEvaluators = evaluatorWeights.length;
+  
+  // Normalize weights so they sum to the number of evaluators
+  const normalizedWeights = evaluatorWeights.map(evaluator => {
+    let normalizedWeight = (evaluator.rawWeight / sumRawWeights) * numEvaluators;
+    
+    // Apply bounds
+    if (normalizedWeight < 0.1) normalizedWeight = 0.1;
+    if (normalizedWeight > 2.0) normalizedWeight = 2.0;
+    
+    return {
+      ...evaluator,
+      normalizedWeight: normalizedWeight
+    };
+  });
+  
+  // Re-normalize after applying bounds
+  const sumBoundedWeights = normalizedWeights.reduce((sum, evaluator) => sum + evaluator.normalizedWeight, 0);
+  normalizedWeights.forEach(evaluator => {
+    evaluator.finalWeight = (evaluator.normalizedWeight / sumBoundedWeights) * numEvaluators;
+  });
+  
+  return normalizedWeights;
+}
+```
+
+### **Final Score Calculation Function**
+```javascript
+function calculateWeightedScore(studentId, allEvaluations, evaluatorWeights) {
+  // Get all evaluations for this student
+  const studentEvaluations = allEvaluations.filter(evaluation => evaluation.evaluatedStudentId === studentId);
+  
+  let weightedSum = 0;
+  let totalWeight = 0;
+  
+  studentEvaluations.forEach(evaluation => {
+    // Find the evaluator's weight
+    const evaluatorWeight = evaluatorWeights.find(ew => ew.evaluatorId === evaluation.evaluatorId);
+    
+    if (evaluatorWeight && evaluation.responseType === 'SCORE') {
+      const score = parseFloat(evaluation.responseValue);
+      const weight = evaluatorWeight.finalWeight;
+      
+      weightedSum += score * weight;
+      totalWeight += weight;
+    }
+  });
+  
+  // Calculate weighted average
+  const finalScore = totalWeight > 0 ? weightedSum / totalWeight : 0;
+  
+  return {
+    studentId: studentId,
+    finalScore: Math.round(finalScore * 100) / 100, // Round to 2 decimal places
+    contributingEvaluators: studentEvaluations.length,
+    totalWeight: totalWeight
+  };
+}
+```
+
+### **Question-Level Scoring Function**
+```javascript
+function calculateQuestionScores(studentId, questionId, allEvaluations, evaluatorWeights) {
+  // Get evaluations for this specific student and question
+  const questionEvaluations = allEvaluations.filter(evaluation => 
+    evaluation.evaluatedStudentId === studentId && 
+    evaluation.questionId === questionId && 
+    evaluation.responseType === 'SCORE'
+  );
+  
+  let weightedSum = 0;
+  let totalWeight = 0;
+  
+  questionEvaluations.forEach(evaluation => {
+    const evaluatorWeight = evaluatorWeights.find(ew => ew.evaluatorId === evaluation.evaluatorId);
+    
+    if (evaluatorWeight) {
+      const score = parseFloat(evaluation.responseValue);
+      const weight = evaluatorWeight.finalWeight;
+      
+      weightedSum += score * weight;
+      totalWeight += weight;
+    }
+  });
+  
+  return {
+    questionId: questionId,
+    score: totalWeight > 0 ? Math.round((weightedSum / totalWeight) * 100) / 100 : 0,
+    evaluatorCount: questionEvaluations.length
+  };
+}
+```
+
+### **Complete Workflow Integration**
+```javascript
+function generateEvaluatorAnalyticsAndWeights() {
+  // This is the main function called by instructors to calculate all weights and scores
+  
+  try {
+    Logger.log('Starting evaluator analytics and weight calculation...');
+    
+    // Step 1: Parse raw survey data
+    const parsedData = parseRawSurveyData();
+    
+    // Step 2: Calculate weights for each evaluator
+    const evaluatorWeights = [];
+    Object.keys(parsedData.students).forEach(evaluatorId => {
+      const evaluatorData = calculateEvaluatorData(evaluatorId, parsedData.responses);
+      const weight = calculateEvaluatorWeight(evaluatorData);
+      weight.evaluatorId = evaluatorId;
+      evaluatorWeights.push(weight);
+    });
+    
+    // Step 3: Normalize weights
+    const normalizedWeights = normalizeWeights(evaluatorWeights);
+    
+    // Step 4: Calculate final scores for all students
+    const finalScores = [];
+    Object.keys(parsedData.students).forEach(studentId => {
+      const score = calculateWeightedScore(studentId, parsedData.responses, normalizedWeights);
+      finalScores.push(score);
+    });
+    
+    // Step 5: Write results to sheets
+    writeAnalyticsToSheet(normalizedWeights, finalScores);
+    
+    Logger.log('Analytics calculation completed successfully');
+    return { evaluatorWeights: normalizedWeights, finalScores: finalScores };
+    
+  } catch (error) {
+    Logger.log(`Error in generateEvaluatorAnalyticsAndWeights: ${error.message}`);
+    throw error;
+  }
+}
+```
+
+**Note**: This code represents the core mathematical implementation exactly as it runs in the system. Students can verify that the documented formulas match the actual calculations performed on their assessments.
+
 ### Weight Application Process
 
 #### 1. **Individual Weight Calculation**
@@ -802,6 +1026,230 @@ SD = √((0.43² + 0.57² + 1.43² + 0.57² + 0.43² + 1.57² + 0.43²)/6) = 0.9
 2. **每位評量者的權重計算分解**
 3. **最終分數組成**，顯示每位評量者的貢獻
 4. **全班評量模式的統計摘要**
+
+## 💻 實際實施程式碼
+
+### **權重計算函數（來自 Workflow_Analytics.js）**
+```javascript
+function calculateEvaluatorWeight(evaluatorData) {
+  // 步驟 1：計算回應一致性（標準差）
+  const ratings = evaluatorData.ratings;
+  const mean = ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+  const variance = ratings.reduce((sum, rating) => sum + Math.pow(rating - mean, 2), 0) / (ratings.length - 1);
+  const standardDeviation = Math.sqrt(variance);
+  
+  // 步驟 2：確定一致性因子
+  let consistencyFactor;
+  if (standardDeviation < 0.5) {
+    consistencyFactor = 0.6;  // 辨別力不足
+  } else if (standardDeviation <= 2.0) {
+    consistencyFactor = 1.0;  // 最佳範圍
+  } else {
+    consistencyFactor = 0.7;  // 過度不一致
+  }
+  
+  // 步驟 3：計算中央趨勢偏誤因子
+  let biasFactor;
+  if (mean <= 1.5 || mean >= 4.5) {
+    biasFactor = 0.7;   // 極端偏誤
+  } else if ((mean <= 2.0 && mean > 1.5) || (mean >= 4.0 && mean < 4.5)) {
+    biasFactor = 0.85;  // 中度偏誤
+  } else {
+    biasFactor = 1.0;   // 平衡評量
+  }
+  
+  // 步驟 4：計算完成因子
+  const completionRate = evaluatorData.studentsEvaluated / evaluatorData.totalStudentsAssigned;
+  let completionFactor;
+  if (completionRate >= 1.0) {
+    completionFactor = 1.0;
+  } else if (completionRate >= 0.8) {
+    completionFactor = 0.9;
+  } else if (completionRate >= 0.6) {
+    completionFactor = 0.7;
+  } else if (completionRate >= 0.4) {
+    completionFactor = 0.5;
+  } else {
+    completionFactor = 0.3;
+  }
+  
+  // 步驟 5：計算品質因子（基於評論長度）
+  const avgCommentLength = evaluatorData.totalCommentLength / evaluatorData.commentCount;
+  let qualityFactor;
+  if (avgCommentLength >= 50) {
+    qualityFactor = 1.1;
+  } else if (avgCommentLength >= 20) {
+    qualityFactor = 1.0;
+  } else if (avgCommentLength >= 10) {
+    qualityFactor = 0.95;
+  } else {
+    qualityFactor = 0.9;
+  }
+  
+  // 步驟 6：計算原始權重
+  const baseWeight = 1.0;
+  const rawWeight = baseWeight * consistencyFactor * biasFactor * completionFactor * qualityFactor;
+  
+  return {
+    rawWeight: rawWeight,
+    factors: {
+      consistency: consistencyFactor,
+      bias: biasFactor,
+      completion: completionFactor,
+      quality: qualityFactor
+    },
+    statistics: {
+      mean: mean,
+      standardDeviation: standardDeviation,
+      completionRate: completionRate,
+      avgCommentLength: avgCommentLength
+    }
+  };
+}
+```
+
+### **權重正規化函數**
+```javascript
+function normalizeWeights(evaluatorWeights) {
+  // 計算所有原始權重的總和
+  const sumRawWeights = evaluatorWeights.reduce((sum, evaluator) => sum + evaluator.rawWeight, 0);
+  const numEvaluators = evaluatorWeights.length;
+  
+  // 正規化權重，使其總和等於評量者人數
+  const normalizedWeights = evaluatorWeights.map(evaluator => {
+    let normalizedWeight = (evaluator.rawWeight / sumRawWeights) * numEvaluators;
+    
+    // 應用界限
+    if (normalizedWeight < 0.1) normalizedWeight = 0.1;
+    if (normalizedWeight > 2.0) normalizedWeight = 2.0;
+    
+    return {
+      ...evaluator,
+      normalizedWeight: normalizedWeight
+    };
+  });
+  
+  // 應用界限後重新正規化
+  const sumBoundedWeights = normalizedWeights.reduce((sum, evaluator) => sum + evaluator.normalizedWeight, 0);
+  normalizedWeights.forEach(evaluator => {
+    evaluator.finalWeight = (evaluator.normalizedWeight / sumBoundedWeights) * numEvaluators;
+  });
+  
+  return normalizedWeights;
+}
+```
+
+### **最終分數計算函數**
+```javascript
+function calculateWeightedScore(studentId, allEvaluations, evaluatorWeights) {
+  // 獲取該學生的所有評量
+  const studentEvaluations = allEvaluations.filter(evaluation => evaluation.evaluatedStudentId === studentId);
+  
+  let weightedSum = 0;
+  let totalWeight = 0;
+  
+  studentEvaluations.forEach(evaluation => {
+    // 找到評量者的權重
+    const evaluatorWeight = evaluatorWeights.find(ew => ew.evaluatorId === evaluation.evaluatorId);
+    
+    if (evaluatorWeight && evaluation.responseType === 'SCORE') {
+      const score = parseFloat(evaluation.responseValue);
+      const weight = evaluatorWeight.finalWeight;
+      
+      weightedSum += score * weight;
+      totalWeight += weight;
+    }
+  });
+  
+  // 計算加權平均
+  const finalScore = totalWeight > 0 ? weightedSum / totalWeight : 0;
+  
+  return {
+    studentId: studentId,
+    finalScore: Math.round(finalScore * 100) / 100, // 四捨五入至小數點後兩位
+    contributingEvaluators: studentEvaluations.length,
+    totalWeight: totalWeight
+  };
+}
+```
+
+### **題目層級評分函數**
+```javascript
+function calculateQuestionScores(studentId, questionId, allEvaluations, evaluatorWeights) {
+  // 獲取該特定學生和題目的評量
+  const questionEvaluations = allEvaluations.filter(evaluation => 
+    evaluation.evaluatedStudentId === studentId && 
+    evaluation.questionId === questionId && 
+    evaluation.responseType === 'SCORE'
+  );
+  
+  let weightedSum = 0;
+  let totalWeight = 0;
+  
+  questionEvaluations.forEach(evaluation => {
+    const evaluatorWeight = evaluatorWeights.find(ew => ew.evaluatorId === evaluation.evaluatorId);
+    
+    if (evaluatorWeight) {
+      const score = parseFloat(evaluation.responseValue);
+      const weight = evaluatorWeight.finalWeight;
+      
+      weightedSum += score * weight;
+      totalWeight += weight;
+    }
+  });
+  
+  return {
+    questionId: questionId,
+    score: totalWeight > 0 ? Math.round((weightedSum / totalWeight) * 100) / 100 : 0,
+    evaluatorCount: questionEvaluations.length
+  };
+}
+```
+
+### **完整工作流程整合**
+```javascript
+function generateEvaluatorAnalyticsAndWeights() {
+  // 這是教師調用以計算所有權重和分數的主要函數
+  
+  try {
+    Logger.log('開始評量者分析和權重計算...');
+    
+    // 步驟 1：解析原始調查數據
+    const parsedData = parseRawSurveyData();
+    
+    // 步驟 2：計算每位評量者的權重
+    const evaluatorWeights = [];
+    Object.keys(parsedData.students).forEach(evaluatorId => {
+      const evaluatorData = calculateEvaluatorData(evaluatorId, parsedData.responses);
+      const weight = calculateEvaluatorWeight(evaluatorData);
+      weight.evaluatorId = evaluatorId;
+      evaluatorWeights.push(weight);
+    });
+    
+    // 步驟 3：正規化權重
+    const normalizedWeights = normalizeWeights(evaluatorWeights);
+    
+    // 步驟 4：計算所有學生的最終分數
+    const finalScores = [];
+    Object.keys(parsedData.students).forEach(studentId => {
+      const score = calculateWeightedScore(studentId, parsedData.responses, normalizedWeights);
+      finalScores.push(score);
+    });
+    
+    // 步驟 5：將結果寫入工作表
+    writeAnalyticsToSheet(normalizedWeights, finalScores);
+    
+    Logger.log('分析計算成功完成');
+    return { evaluatorWeights: normalizedWeights, finalScores: finalScores };
+    
+  } catch (error) {
+    Logger.log(`generateEvaluatorAnalyticsAndWeights 錯誤: ${error.message}`);
+    throw error;
+  }
+}
+```
+
+**注意**：此程式碼代表系統中運行的核心數學實施。學生可以驗證記錄的公式是否與對其評量執行的實際計算相符。
 
 ### 權重應用流程
 
