@@ -38,3 +38,6 @@ Thumbs.db
 *~
 
 # Any other files specific to your local setup that shouldn't be versioned
+
+# Claude AI conversation folder
+claude/
